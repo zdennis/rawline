@@ -24,9 +24,11 @@ editor.terminal.keys.merge!(enter: [13])
 editor.bind(:return){ editor.newline }
 
 editor.bind(:ctrl_g) { editor.clear_history }
-editor.bind(:ctrl_d) { editor.debug_line }
-editor.bind(:ctrl_e) { editor.show_history }
-editor.bind(:ctrl_x) { puts; puts "Exiting..."; exit }
+editor.bind(:ctrl_l) { editor.debug_line }
+editor.bind(:ctrl_h) { editor.show_history }
+editor.bind(:ctrl_d) { puts; puts "Exiting..."; exit }
+editor.bind(:ctrl_a) { editor.move_to_position 0 }
+editor.bind(:ctrl_e) { editor.move_to_position editor.line.length }
 
 editor.completion_proc = lambda do |word|
 	if word
