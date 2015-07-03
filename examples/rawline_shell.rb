@@ -1,6 +1,16 @@
 #!usr/bin/env ruby
 
 require File.dirname(File.expand_path(__FILE__))+'/../lib/rawline'
+require 'io/console'
+
+require 'highline/system_extensions'
+module HighLine::SystemExtensions
+	def get_character( input = STDIN )
+		input.raw do
+	  	input.getbyte
+		end
+  end
+end
 
 puts "*** Rawline Editor Test Shell ***"
 puts " * Press CTRL+X to exit"
