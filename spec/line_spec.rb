@@ -35,8 +35,9 @@ describe RawLine::Line do
 		expect(@line.position).to eq(1)
 		@line.left 4
 		expect(@line.position).to eq(0)
-		@line.right HighLine::SystemExtensions.terminal_size()[0]+10
-		expect(@line.position).to eq(HighLine::SystemExtensions.terminal_size()[0]-2)
+		@line.right HighLine::SystemExtensions.terminal_size[0]+10
+
+		expect(@line.position).to eq(HighLine::SystemExtensions.terminal_size[0]+10)
 		expect(@line.eol).to eq(6)
 	end
 

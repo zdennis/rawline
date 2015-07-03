@@ -269,23 +269,21 @@ module RawLine
 		# won't be saved in the history of the current line.
 		#
 		def print_character(char=@char, no_line_history = false)
-			unless @line.length >= @line.max_length-2 then
-				if @line.position < @line.length then
-					chars = select_characters_from_cursor if @mode == :insert
-					@output.putc char
-					@line.text[@line.position] = (@mode == :insert) ? "#{char.chr}#{@line.text[@line.position].chr}" : "#{char.chr}"
-					@line.right
-					if @mode == :insert then
-						raw_print chars
-						chars.length.times { @output.putc ?\b.ord } # move cursor back
-					end
-				else
-					@output.putc char
-					@line.right
-					@line << char 
+			if @line.position < @line.length then
+				chars = select_characters_from_cursor if @mode == :insert
+				@output.putc char
+				@line.text[@line.position] = (@mode == :insert) ? "#{char.chr}#{@line.text[@line.position].chr}" : "#{char.chr}"
+				@line.right
+				if @mode == :insert then
+					raw_print chars
+					chars.length.times { @output.putc ?\b.ord } # move cursor back
 				end
-				add_to_line_history unless no_line_history
+			else
+				@output.putc char
+				@line.right
+				@line << char
 			end
+			add_to_line_history unless no_line_history
 		end
 
 		# 

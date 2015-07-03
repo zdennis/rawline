@@ -134,7 +134,7 @@ module RawLine
 		# Increment the line position by <tt>offset</tt>
 		#
 		def right(offset=1)
-			@position = (@position+offset >= max_length) ? max_length : @position+offset
+			@position += offset
 		end
 
 		# 
