@@ -20,6 +20,9 @@ puts " * Press CTRL+E to view command history"
 
 editor = RawLine::Editor.new
 
+editor.terminal.keys.merge!(enter: [13])
+editor.bind(:return){ editor.newline }
+
 editor.bind(:ctrl_g) { editor.clear_history }
 editor.bind(:ctrl_d) { editor.debug_line }
 editor.bind(:ctrl_e) { editor.show_history }
