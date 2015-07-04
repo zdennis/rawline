@@ -49,6 +49,7 @@ require "#{dir}/rawline/terminal/windows_terminal"
 require "#{dir}/rawline/terminal/vt220_terminal"
 require "#{dir}/rawline/history_buffer"
 require "#{dir}/rawline/line"
+require "#{dir}/rawline/prompt"
 require "#{dir}/rawline/editor"
 
 module RawLine

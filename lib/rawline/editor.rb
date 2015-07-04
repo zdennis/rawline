@@ -102,6 +102,7 @@ module RawLine
     # * An optional flag can be specified to enable/disable editor history (false)
     #
     def read(prompt="", add_history=false)
+      prompt = Prompt.new(prompt)
       update_word_separator
       @output.print prompt if prompt != ""
       @add_history = add_history
