@@ -12,7 +12,7 @@
 #
 module RawLine
 
-  # 
+  #
   # The HistoryBuffer class is used to hold the editor and line histories, as well
   # as word completion matches.
   #
@@ -22,8 +22,8 @@ module RawLine
     attr_accessor :duplicates, :exclude, :cycle
 
     #
-    # Create an instance of RawLine::HistoryBuffer. 
-    # This method takes an optional block used to override the 
+    # Create an instance of RawLine::HistoryBuffer.
+    # This method takes an optional block used to override the
     # following instance attributes:
     # * <tt>@duplicates</tt> - whether or not duplicate items will be stored in the buffer.
     # * <tt>@exclude</tt> - a Proc object defining exclusion rules to prevent items from being added to the buffer.
@@ -46,18 +46,18 @@ module RawLine
         @size-new_size.times { pop }
       end
       @size = new_size
-      @position = nil 
+      @position = nil
     end
-    
-    # 
+
+    #
     # Clear the content of the buffer and reset <tt>@position</tt> to nil.
     #
     def empty
-      @position = nil 
+      @position = nil
       clear
     end
 
-    # 
+    #
     # Retrieve the element at <tt>@position</tt>.
     #
     def get
@@ -66,14 +66,14 @@ module RawLine
       at @position
     end
 
-    # 
+    #
     # Return true if <tt>@position</tt> is at the end of the buffer.
     #
     def end?
       @position == length-1
     end
 
-    # 
+    #
     # Return true if <tt>@position</tt> is at the start of the buffer.
     #
     def start?
@@ -90,7 +90,7 @@ module RawLine
         @position = length-1
       when 0 then
          @position = length-1 if @cycle
-      else 
+      else
         @position -= 1
       end
     end
@@ -105,12 +105,12 @@ module RawLine
         @position = length-1
       when length-1 then
          @position = 0 if @cycle
-      else 
+      else
         @position += 1
       end
     end
 
-    # 
+    #
     # Add a new item to the buffer.
     #
     def push(item)
@@ -118,12 +118,12 @@ module RawLine
       unless @exclude.call(item)
         # Remove the oldest element if size is exceeded
         if @size <= length
-          reverse!.pop 
+          reverse!.pop
           reverse!
         end
         # Add the new item and reset the position
         super(item)
-        @position = nil 
+        @position = nil
       end
     end
 

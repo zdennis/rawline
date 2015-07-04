@@ -10,8 +10,8 @@
 #
 
 module RawLine
-  
-  # 
+
+  #
   # This class is used to define all the most common character codes and
   # escape sequences used on *nix systems.
   #
@@ -56,7 +56,7 @@ module RawLine
           :ctrl_alt_w => [?\e.ord, ?\C-w.ord],
           :ctrl_alt_x => [?\e.ord, ?\C-x.ord],
           :ctrl_alt_y => [?\e.ord, ?\C-y.ord],
-          :ctrl_alt_z => [?\e.ord, ?\C-z.ord]      
+          :ctrl_alt_z => [?\e.ord, ?\C-z.ord]
         })
     end
 

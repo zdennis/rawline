@@ -10,8 +10,8 @@
 #
 
 module RawLine
-  
-  # 
+
+  #
   # This class is used to define all the most common character codes and
   # escape sequences used on Windows systems.
   #
@@ -30,7 +30,7 @@ module RawLine
           :delete => [224, 83],
           :backspace => [8],
           :enter => [13],
-          
+
           :ctrl_alt_a => [0, 30],
           :ctrl_alt_b => [0, 48],
           :ctrl_alt_c => [0, 46],

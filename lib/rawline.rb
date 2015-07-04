@@ -57,7 +57,7 @@ module RawLine
     class << self;  attr_accessor :editor end
     @editor = RawLine::Editor.new
 
-    @implemented_methods = 
+    @implemented_methods =
       [
         :completion_proc,
         :completion_proc=,
@@ -74,7 +74,7 @@ module RawLine
         :match_hidden_files=
       ]
 
-    @implemented_methods.each do |meth|        
+    @implemented_methods.each do |meth|
       self.class.module_eval do
         define_method meth do |*args|
           case args.length
@@ -83,14 +83,14 @@ module RawLine
           when 1 then
             @editor.send(meth, args[0])
           else
-            raise ArgumentError, "There are no Readline methods with more than one parameter"            
+            raise ArgumentError, "There are no Readline methods with more than one parameter"
           end
         end
       end
     end
-    
+
     private
-    
+
     HISTORY = RawLine.editor.history
     FILENAME_COMPLETION_PROC = RawLine.editor.filename_completion_proc
 
@@ -102,7 +102,7 @@ module RawLine
 
       alias rawline readline
     end
-    
+
     self.class.module_eval { readline_method.call }
     self.module_eval { readline_method.call }
 

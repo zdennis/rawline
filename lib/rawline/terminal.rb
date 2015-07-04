@@ -11,8 +11,8 @@
 #
 #
 module RawLine
-  
-  # 
+
+  #
   # The Terminal class defines character codes and code sequences which can be
   # bound to actions by editors.
   # An OS-dependent subclass of RawLine::Terminal is automatically instantiated by
@@ -25,11 +25,11 @@ module RawLine
     attr_accessor :escape_codes
     attr_reader :keys, :escape_sequences
 
-    # 
+    #
     # Create an instance of RawLine::Terminal.
     #
     def initialize
-      @keys = 
+      @keys =
         {
         :tab => [?\t.ord],
         :return => [?\r.ord],

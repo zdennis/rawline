@@ -359,7 +359,7 @@ module RawLine
       add_to_history
     end
 
-    # 
+    #
     # Move the cursor left (if possible) by printing a
     # backspace, updating <tt>@line.position</tt> accordingly.
     # This action is bound to the left arrow key by default.
@@ -696,7 +696,6 @@ module RawLine
       undef move_right
       def move_right
         unless @line.position > @line.eol then
-
           @line.right
           move_down_a_line = ((@line.position + @line.prompt.length) % terminal_width) == 0
 
