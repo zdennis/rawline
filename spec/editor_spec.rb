@@ -65,6 +65,102 @@ describe RawLine::Editor do
 		expect(@editor.line.position).to eq(6)
 	end
 
+  describe "keeping track of the cursor position across terminal lines (e.g. multi-line editing)" do
+    let(:terminal_width){ 3 }
+    let(:terminal_height){ 7 }
+    let(:output){ @output.rewind ; @output.read }
+    let(:arrow_key_left_ansi){ "\e[D" }
+    let(:arrow_key_right_ansi){ "\e[C" }
+
+    before do
+      allow(@editor).to receive(:terminal_size).and_return [terminal_width, terminal_height]
+    end
+
+    context "and the cursor position is at the first character of the second line" do
+      before do
+    		@input << "123"
+      end
+
+      it "is at the first character of a second line" do
+        @input.rewind
+        @editor.read
+        expect(@editor.line.position).to eq(3)
+      end
+
+      describe "moving left from the first position of the second line" do
+        before do
+          @input << arrow_key_left_ansi
+          @input.rewind
+          @editor.read
+        end
+
+        it "sends the escape sequences moving the cursor to the end of the previous line" do
+          expected_ansi_sequence = "\e[A\e[#{terminal_width}C"
+          expect(output).to eq("123#{expected_ansi_sequence}\n")
+        end
+
+        it "correctly sets the line's position" do
+          expect(@editor.line.position).to eq(2)
+        end
+      end
+
+      describe "moving right from the first position of the second line" do
+        before do
+          @input << arrow_key_right_ansi
+          @input.rewind
+          @editor.read
+        end
+
+        it "doesn't send any escape sequences" do
+          expected_ansi_sequence = "\e[A\e[#{terminal_width}C"
+          expect(output).to_not include("\e")
+        end
+
+        it "doesn't move the cursor when it's at the end of the input" do
+          expect(@editor.line.position).to eq(3)
+        end
+      end
+
+      describe "moving left to the previous line then right to the next line" do
+        before do
+          # this is the one that moves us to the previous line
+          @input << arrow_key_left_ansi
+
+          # these are for fun to show that we don't generate unnecessary
+          # escape sequences
+          @input << arrow_key_left_ansi
+          @input << arrow_key_left_ansi
+          @input << arrow_key_left_ansi
+
+          # now let's move right again
+          @input << arrow_key_right_ansi
+          @input << arrow_key_right_ansi
+          @input << arrow_key_right_ansi
+
+          # this is the one that puts us on the next line
+          @input << arrow_key_right_ansi
+
+          @input.rewind
+          @editor.read
+        end
+
+        it "sends the the escape sequence for moving to the previous line just once" do
+          expected_ansi_sequence = "\e[A\e[#{terminal_width}C"
+          expect(output.scan(expected_ansi_sequence).flatten.length).to eq(1)
+        end
+
+        it "sends the the escape sequence for moving to the next line just once" do
+          expected_ansi_sequence = "\e[B\e[#{terminal_width}D"
+          expect(output.scan(expected_ansi_sequence).flatten.length).to eq(1)
+        end
+
+        it "correctly sets the line's position" do
+          expect(@editor.line.position).to eq(3)
+        end
+      end
+    end
+  end
+
 	it "can delete characters" do
 		@input << "test #5"
 		@input.rewind

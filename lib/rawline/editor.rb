@@ -678,8 +678,15 @@ module RawLine
 			undef move_left
 			def move_left
 				unless @line.bol? then
+					move_up_a_line = ((@line.position + @line.prompt.length) % terminal_width) == 0
+
 					@line.left
-					escape "\e[D"
+
+					if move_up_a_line
+						escape "\e[A\e[#{terminal_width}C"
+					else
+						escape "\e[D"
+					end
 					return true
 				end
 				false
@@ -688,13 +695,23 @@ module RawLine
 			undef move_right
 			def move_right
 				unless @line.position > @line.eol then
+
 					@line.right
-					escape "\e[C"
+					move_down_a_line = ((@line.position + @line.prompt.length) % terminal_width) == 0
+
+					if move_down_a_line
+						escape "\e[B\e[#{terminal_width}D"
+					else
+						escape "\e[C"
+					end
 					return true
 				end
 				false
 			end
 
+			def terminal_width
+				terminal_size[0]
+			end
 		end
 	end
 
