@@ -23,7 +23,7 @@
 * Line is no longer added to history when calling Editor#history_back.
 * Added Editor#filename_completion_proc.
 * Editor#completion_proc defaults to Editor#filename_completion_proc.
-*	RawLine is now a drop-in replacement for Readline.
+*  RawLine is now a drop-in replacement for Readline.
 * Added examples/readline_emulation.rb.
 * Moved repository to GitHub.
 

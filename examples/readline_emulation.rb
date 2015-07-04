@@ -13,5 +13,5 @@ Dir.chdir '..'
 include Rawline
 
 loop do
-	puts "You typed: [#{readline("=> ", true)}]"
+  puts "You typed: [#{readline("=> ", true)}]"
 end

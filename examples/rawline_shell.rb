@@ -5,10 +5,10 @@ require 'io/console'
 
 require 'highline/system_extensions'
 module HighLine::SystemExtensions
-	def get_character( input = STDIN )
-		input.raw do
-	  	input.getbyte
-		end
+  def get_character( input = STDIN )
+    input.raw do
+      input.getbyte
+    end
   end
 end
 
@@ -31,11 +31,11 @@ editor.bind(:ctrl_a) { editor.move_to_position 0 }
 editor.bind(:ctrl_e) { editor.move_to_position editor.line.length }
 
 editor.completion_proc = lambda do |word|
-	if word
-		['select', 'update', 'delete', 'debug', 'destroy'].find_all	{ |e| e.match(/^#{Regexp.escape(word)}/) }
-	end
+  if word
+    ['select', 'update', 'delete', 'debug', 'destroy'].find_all  { |e| e.match(/^#{Regexp.escape(word)}/) }
+  end
 end
 
 loop do
-	puts "You typed: [#{editor.read("=> ", true)}]"
+  puts "You typed: [#{editor.read("=> ", true)}]"
 end
