@@ -305,6 +305,7 @@ module RawLine
       sub_word = @line.text[@line.word[:start]..@line.position-1] || ""
       matches  = @completion_proc.call(sub_word) unless !completion_proc || @completion_proc == []
       matches = matches.to_a.compact.sort.reverse
+
       complete_word = lambda do |match|
         unless @line.word[:text].length == 0
           # If not in a word, print the match, otherwise continue existing word
@@ -322,7 +323,9 @@ module RawLine
         complete_word.call(match)
         read_character
         while @char == completion_char do
-          move_to_position(word_start)
+          # clear the current completed word so we can replace it
+          # with a new completed word
+          (@line.position - word_start).times { delete_left_character }
           @completion_matches.back
           match = @completion_matches.get
           complete_word.call(match)
