@@ -20,6 +20,7 @@ module RawLine
 
     attr_reader :position, :size
     attr_accessor :duplicates, :exclude, :cycle
+    attr_accessor :matching_text
 
     #
     # Create an instance of RawLine::HistoryBuffer.
@@ -35,6 +36,18 @@ module RawLine
       @cycle = false
       yield self if block_given?
       @size = size
+      @position = nil
+    end
+
+    def matching_text=(text)
+      @matching_text = text
+
+      # reset the current position
+      @position = nil
+    end
+
+    def reset_search
+      @matching_text = nil
       @position = nil
     end
 
@@ -80,18 +93,43 @@ module RawLine
       @position == 0
     end
 
+    def find_position_in_history(matching_text, backward=true)
+      # if we have a position use it. If we don't assume we're at the
+      # most recent addition which is likely what is the current user's line,
+      # so go back twice to start at the first real line of history
+      index = (@position || length) - 1
+      no_match = nil
+
+      snapshot = self[0..index].dup
+      snapshot.reverse! if backward
+
+      position = snapshot.each_with_index.reduce(no_match) do |no_match, (text, i)|
+        if text =~ /^#{Regexp.escape(matching_text)}/
+          # convert to non-reversed indexing
+          new_position = backward ? snapshot.length - (i + 1) : i
+          break new_position
+        else
+          no_match
+        end
+      end
+    end
+
     #
     # Decrement <tt>@position</tt>.
     #
     def back
       return nil unless length > 0
-      case @position
-      when nil then
-        @position = length-1
-      when 0 then
-         @position = length-1 if @cycle
+      if matching_text
+        @position = find_position_in_history(matching_text) || @position
       else
-        @position -= 1
+        case @position
+        when nil then
+          nil
+        when 0 then
+           @position = length-1 if @cycle
+        else
+          @position -= 1
+        end
       end
     end
 
@@ -102,9 +140,9 @@ module RawLine
       return nil unless length > 0
       case @position
       when nil then
-        @position = length-1
+        nil
       when length-1 then
-         @position = 0 if @cycle
+        @position = 0 if @cycle
       else
         @position += 1
       end

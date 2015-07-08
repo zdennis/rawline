@@ -284,6 +284,7 @@ module RawLine
         @line.right
         @line << char
       end
+			@history.matching_text = @line.text
       add_to_line_history unless no_line_history
     end
 
@@ -360,6 +361,7 @@ module RawLine
     #
     def newline
       add_to_history
+			@history.reset_search
     end
 
     #
@@ -475,6 +477,7 @@ module RawLine
       add_to_line_history
       @line.text = ""
       @line.position = 0
+      @history.reset_search
     end
 
     #
