@@ -623,13 +623,20 @@ module RawLine
       unless history.empty?
         history.back
         line = history.get
-        overwrite_line(line)
+        cursor_position = if history.matching_text
+          [line.length, history.matching_text.length].min
+        end
+        overwrite_line(line, cursor_position)
       end
     end
 
     def generic_history_forward(history)
       if history.forward then
-        overwrite_line(history.get)
+        line = history.get
+        cursor_position = if history.matching_text
+          [line.length, history.matching_text.length].min
+        end
+        overwrite_line(line, cursor_position)
       end
     end
 
