@@ -504,16 +504,6 @@ module RawLine
     # This action is bound to the up arrow key by default.
     #
     def history_back
-      unless @history.position
-        current_line = @line.text.dup
-        # Temporarily override exclusion rules
-        exclude = @history.exclude.dup
-        @history.exclude = lambda{|a|}
-        # Add current line
-        @history << current_line
-        @history.exclude = exclude
-        @history.back
-      end
       generic_history_back(@history)
       add_to_line_history
     end
