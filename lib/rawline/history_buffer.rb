@@ -71,12 +71,12 @@ module RawLine
     end
 
     #
-    # Retrieve the element at <tt>@position</tt>.
+    # Retrieve a copy of the element at <tt>@position</tt>.
     #
     def get
       return nil unless length > 0
-      @position = length-1 unless @position
-      at @position
+      return nil unless @position
+      at(@position).dup
     end
 
     #
