@@ -623,6 +623,8 @@ module RawLine
       unless history.empty?
         history.back
         line = history.get
+        return unless line
+
         cursor_position = if history.matching_text
           [line.length, history.matching_text.length].min
         end
@@ -631,8 +633,10 @@ module RawLine
     end
 
     def generic_history_forward(history)
-      if history.forward then
+      if history.forward
         line = history.get
+        return unless line
+
         cursor_position = if history.matching_text
           [line.length, history.matching_text.length].min
         end
