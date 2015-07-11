@@ -93,21 +93,36 @@ module RawLine
       @position == 0
     end
 
-    def find_position_in_history(matching_text, backward=true)
-      # if we have a position use it. If we don't assume we're at the
-      # most recent addition which is likely what is the current user's line,
-      # so go back twice to start at the first real line of history
+    def find_position_backward_in_history(matching_text)
       index = (@position || length) - 1
-      no_match = nil
+      return @position unless index >= 0
 
-      snapshot = self[0..index].dup
-      snapshot.reverse! if backward
+      snapshot = self[0..index].dup.reverse
+      no_match = nil
 
       position = snapshot.each_with_index.reduce(no_match) do |no_match, (text, i)|
         if text =~ /^#{Regexp.escape(matching_text)}/
           # convert to non-reversed indexing
-          new_position = backward ? snapshot.length - (i + 1) : i
-          break new_position
+          position = snapshot.length - (i + 1)
+          break position
+        else
+          no_match
+        end
+      end
+    end
+
+    def find_position_forward_in_history(matching_text)
+      $z.puts caller
+      return nil unless @position
+
+      index = @position + 1
+      snapshot = self[index..-1].dup
+      no_match = nil
+
+      position = snapshot.each_with_index.reduce(no_match) do |no_match, (text, i)|
+        if text =~ /^#{Regexp.escape(matching_text)}/
+          position = index + i
+          break position
         else
           no_match
         end
@@ -120,13 +135,13 @@ module RawLine
     def back
       return nil unless length > 0
       if matching_text
-        @position = find_position_in_history(matching_text) || @position
+        @position = find_position_backward_in_history(matching_text) || @position
       else
         case @position
         when nil then
-          nil
+          @position = length-1
         when 0 then
-           @position = length-1 if @cycle
+          @position = length-1 if @cycle
         else
           @position -= 1
         end
@@ -138,13 +153,18 @@ module RawLine
     #
     def forward
       return nil unless length > 0
-      case @position
-      when nil then
-        nil
-      when length-1 then
-        @position = 0 if @cycle
+      if matching_text
+        @position = find_position_forward_in_history(matching_text) || @position
+        true
       else
-        @position += 1
+        case @position
+        when nil then
+          nil
+        when length-1 then
+          @position = 0 if @cycle
+        else
+          @position += 1
+        end
       end
     end
 
