@@ -112,7 +112,6 @@ module RawLine
     end
 
     def find_position_forward_in_history(matching_text)
-      $z.puts caller
       return nil unless @position
 
       index = @position + 1
