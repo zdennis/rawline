@@ -549,12 +549,25 @@ module RawLine
     # with <tt>new_line</tt>, and optionally reset the cursor position to
     # <tt>position</tt>.
     #
-    def overwrite_line(new_line, position=nil)
+    def overwrite_line(new_line, position=nil, options={})
       pos = position || new_line.length
       text = @line.text
       @output.putc ?\r.ord
       print @line.prompt
-      raw_print new_line
+
+      if options[:highlight_up_to]
+        highlighted_new_line = new_line.chars.map.with_index{ |ch, i|
+          if i < options[:highlight_up_to]
+            "\e[1m#{ch}\e[0m"
+          else
+            ch
+          end
+        }.join
+        raw_print highlighted_new_line
+      else
+        raw_print new_line
+      end
+
       n = text.length-new_line.length+1
       if n > 0
         n.times { @output.putc ?\s.ord }
@@ -628,7 +641,7 @@ module RawLine
         cursor_position = if history.matching_text
           [line.length, history.matching_text.length].min
         end
-        overwrite_line(line, cursor_position)
+        overwrite_line(line, cursor_position, highlight_up_to: cursor_position)
       end
     end
 
@@ -640,7 +653,7 @@ module RawLine
         cursor_position = if history.matching_text
           [line.length, history.matching_text.length].min
         end
-        overwrite_line(line, cursor_position)
+        overwrite_line(line, cursor_position, highlight_up_to: cursor_position)
       end
     end
 
