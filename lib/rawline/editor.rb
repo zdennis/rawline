@@ -114,6 +114,7 @@ module RawLine
       loop do
         read_character
         process_character
+        @history.matching_text = @line.text[0...@line.position]
         break if @char == @terminal.keys[:enter] || !@char
       end
       @output.print "\n"
@@ -284,7 +285,6 @@ module RawLine
         @line.right
         @line << char
       end
-			@history.matching_text = @line.text
       add_to_line_history unless no_line_history
     end
 
@@ -556,15 +556,10 @@ module RawLine
       print @line.prompt
 
       if options[:highlight_up_to]
-        highlighted_new_line = new_line.chars.map.with_index{ |ch, i|
-          if i < options[:highlight_up_to]
-            "\e[1m#{ch}\e[0m"
-          else
-            ch
-          end
-        }.join
-        raw_print highlighted_new_line
+        @highlighting = true
+        raw_print highlight_text_up_to(new_line, options[:highlight_up_to])
       else
+        @highlighting = false
         raw_print new_line
       end
 
@@ -576,6 +571,16 @@ module RawLine
       @line.position = new_line.length
       move_to_position(pos)
       @line.text = new_line
+    end
+
+    def highlight_text_up_to(text, position)
+      text.chars.map.with_index{ |ch, i|
+        if i < position
+          "\e[1m#{ch}\e[0m"
+        else
+          ch
+        end
+      }.join
     end
 
     #

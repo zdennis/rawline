@@ -41,9 +41,6 @@ module RawLine
 
     def matching_text=(text)
       @matching_text = text
-
-      # reset the current position
-      @position = nil
     end
 
     def reset_search
