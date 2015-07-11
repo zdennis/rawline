@@ -152,7 +152,12 @@ module RawLine
     # Add a new item to the buffer.
     #
     def push(item)
-      delete(item) unless @duplicates
+
+      if !@duplicates && self[-1] == item
+        # skip adding this line
+        return
+      end
+
       unless @exclude.call(item)
         # Remove the oldest element if size is exceeded
         if @size <= length
