@@ -20,7 +20,8 @@ module RawLine
 
     attr_reader :position, :size
     attr_accessor :duplicates, :exclude, :cycle
-    attr_accessor :matching_text
+
+    attr_accessor :search_strategy
 
     #
     # Create an instance of RawLine::HistoryBuffer.
@@ -39,13 +40,26 @@ module RawLine
       @position = nil
     end
 
-    def matching_text=(text)
-      @matching_text = text
+    #
+    # Clears the current position on the history object. Useful when deciding
+    # to cancel/reset history navigation.
+    #
+    def clear_position
+      @position = nil
     end
 
-    def reset_search
-      @matching_text = nil
-      @position = nil
+    #
+    # Returns true|false depending on whether the history's search is capable of
+    # partial-text matching against the history based on what the user has input.
+    #
+    # The default return value is false. If a search strategy is is applied
+    # that does support partial text matching then it should implement this
+    # method and have it return true.
+    #
+    def supports_partial_text_matching?
+      search_strategy &&
+        search_strategy.respond_to?(:supports_partial_text_matching?) &&
+        search_strategy.supports_partial_text_matching?
     end
 
     #
@@ -90,48 +104,24 @@ module RawLine
       @position == 0
     end
 
-    def find_position_backward_in_history(matching_text)
-      index = (@position || length) - 1
-      return @position unless index >= 0
-
-      snapshot = self[0..index].dup.reverse
-      no_match = nil
-
-      position = snapshot.each_with_index.reduce(no_match) do |no_match, (text, i)|
-        if text =~ /^#{Regexp.escape(matching_text)}/
-          # convert to non-reversed indexing
-          position = snapshot.length - (i + 1)
-          break position
-        else
-          no_match
-        end
-      end
-    end
-
-    def find_position_forward_in_history(matching_text)
-      return nil unless @position
-
-      index = @position + 1
-      snapshot = self[index..-1].dup
-      no_match = nil
-
-      position = snapshot.each_with_index.reduce(no_match) do |no_match, (text, i)|
-        if text =~ /^#{Regexp.escape(matching_text)}/
-          position = index + i
-          break position
-        else
-          no_match
-        end
-      end
-    end
-
     #
-    # Decrement <tt>@position</tt>.
+    # Decrement <tt>@position</tt>. By default the history will become
+    # positioned at the previous item.
     #
-    def back
+    # If <tt>@cycle</tt> is set to true then the history will cycle to the end
+    # when it finds itself at the beginning. If false calling this when
+    # at the beginning will result in the position not changing.
+    #
+    # If a search strategy is assigned then the method <tt>search_backward</tt> will be
+    # called on the search strategy to determine the position. This method is
+    # given any passed in <tt>options</tt> as well as a <tt>:history</tt> option. The
+    # <tt>:history</tt> option will be a reference to self.
+    #
+    def back(options={})
       return nil unless length > 0
-      if matching_text
-        @position = find_position_backward_in_history(matching_text) || @position
+
+      if search_strategy
+        @position = search_strategy.search_backward(options.merge(history:self)) || @position
       else
         case @position
         when nil then
@@ -145,13 +135,23 @@ module RawLine
     end
 
     #
-    # Increment <tt>@position</tt>.
+    # Increment <tt>@position</tt>. By default the history will become
+    # positioned at the next item.
     #
-    def forward
+    # If <tt>@cycle</tt> is set to true then the history will cycle back to the
+    # beginning when it finds itself at the end. If false calling this when
+    # at the end will result in the position not changing.
+    #
+    # If a search strategy is assigned then the method <tt>search_forward</tt> will be
+    # called on the search strategy to determine the position. This method is
+    # given any passed in <tt>options</tt> as well as a <tt>:history</tt> option. The
+    # <tt>:history</tt> option will be a reference to self. If <tt>
+    #
+    def forward(options={})
       return nil unless length > 0
-      if matching_text
-        @position = find_position_forward_in_history(matching_text) || @position
-        true
+
+      if search_strategy
+        @position = search_strategy.search_forward(options.merge(history:self)) || @position
       else
         case @position
         when nil then
