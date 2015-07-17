@@ -48,6 +48,10 @@ module RawLine
       @position = nil
     end
 
+    def searching?
+      !!@position
+    end
+
     #
     # Returns true|false depending on whether the history's search is capable of
     # partial-text matching against the history based on what the user has input.

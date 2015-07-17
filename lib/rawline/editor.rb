@@ -694,7 +694,11 @@ module RawLine
     def matching_text
       return nil unless @line
       return nil if @line.text == ""
-      @line[0...@line.position]
+      if @history.searching?
+        @matching_text
+      else
+        @matching_text = @line[0...@line.position]
+      end
     end
   end
 
