@@ -115,6 +115,7 @@ module RawLine
       loop do
         read_character
         process_character
+        @matching_text = @line.text[0...@line.position]
         break if @char == @terminal.keys[:enter] || !@char
       end
       @output.print "\n"
