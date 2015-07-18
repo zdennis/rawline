@@ -113,9 +113,17 @@ module RawLine
       end
       add_to_line_history
       loop do
+        old_position = @line.position
+
         read_character
         process_character
-        @matching_text = @line.text[0...@line.position]
+        new_position = @line.position
+
+        if !@ignore_position_change && new_position != old_position
+          @matching_text = @line.text[0...@line.position]
+        end
+
+        @ignore_position_change = false
         break if @char == @terminal.keys[:enter] || !@char
       end
       @output.print "\n"
@@ -569,6 +577,7 @@ module RawLine
         n.times { @output.putc ?\s.ord }
         n.times { @output.putc ?\b.ord }
       end
+      @ignore_position_change = true
       @line.position = new_line.length
       move_to_position(pos)
       @line.text = new_line
@@ -644,8 +653,13 @@ module RawLine
         line = history.get
         return unless line
 
-        cursor_position = if supports_partial_text_matching? && highlight_history_matching_text
-          [line.length, matching_text.length].min
+        cursor_position = nil
+        if supports_partial_text_matching? && highlight_history_matching_text
+          if line && matching_text
+            cursor_position = [line.length, matching_text.length].min
+          elsif matching_text
+            cursor_position = matching_text.length
+          end
         end
 
         overwrite_line(line, cursor_position, highlight_up_to: cursor_position)
