@@ -489,6 +489,14 @@ module RawLine
       @history.clear_position
     end
 
+    def clear_screen
+      t = TermInfo.new(ENV["TERM"], @output)
+      t.control "clear"
+      @output.print @line.prompt
+      @output.print @line.text
+      (@line.length - @line.position).times { @output.putc ?\b.ord }
+    end
+
     #
     # Undo the last modification to the current line (<tt>@line.text</tt>).
     # This action is bound to ctrl+z by default.
