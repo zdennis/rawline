@@ -568,6 +568,16 @@ module RawLine
     #
     def overwrite_line(new_line, position=nil, options={})
       pos = position || new_line.length
+
+      # determine the number of lines we need to delete before we can cleanly
+      # overwrite
+      number_of_lines = (@line.position + @line.prompt.length) / terminal_width
+
+      escape "\e[1K"
+      number_of_lines.times {
+        escape "\e[A\e[#{terminal_width}C\e[1K"
+      }
+
       text = @line.text
       @output.putc ?\r.ord
       @output.print @line.prompt
