@@ -480,7 +480,7 @@ module RawLine
     #
     def clear_line
       @output.putc ?\r
-      print @line.prompt
+      @output.print @line.prompt
       @line.length.times { @output.putc ?\s.ord }
       @line.length.times { @output.putc ?\b.ord }
       add_to_line_history
@@ -570,7 +570,7 @@ module RawLine
       pos = position || new_line.length
       text = @line.text
       @output.putc ?\r.ord
-      print @line.prompt
+      @output.print @line.prompt
 
       if options[:highlight_up_to]
         @highlighting = true
