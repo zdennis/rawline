@@ -9,6 +9,8 @@
 # This is Free Software.  See LICENSE for details.
 #
 
+require 'forwardable'
+
 module RawLine
 
   #
@@ -32,7 +34,7 @@ module RawLine
   # * CTRL+Y: redo (unless already registered by the OS)
   #
   class Editor
-
+    extend Forwardable
     include HighLine::SystemExtensions
 
     attr_accessor :char, :history_size, :line_history_size, :highlight_history_matching_text
@@ -40,6 +42,8 @@ module RawLine
     attr_accessor :completion_proc, :line, :history, :completion_append_string
     attr_accessor :match_hidden_files, :completion_matches
     attr_accessor :word_break_characters
+
+    def_delegators :@output, :puts
 
     #
     # Create an instance of RawLine::Editor which can be used
