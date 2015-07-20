@@ -21,8 +21,6 @@ module RawLine
     attr_reader :position, :size
     attr_accessor :duplicates, :exclude, :cycle
 
-    attr_accessor :search_strategy
-
     #
     # Create an instance of RawLine::HistoryBuffer.
     # This method takes an optional block used to override the
@@ -52,18 +50,8 @@ module RawLine
       !!@position
     end
 
-    #
-    # Returns true|false depending on whether the history's search is capable of
-    # partial-text matching against the history based on what the user has input.
-    #
-    # The default return value is false. If a search strategy is is applied
-    # that does support partial text matching then it should implement this
-    # method and have it return true.
-    #
     def supports_partial_text_matching?
-      search_strategy &&
-        search_strategy.respond_to?(:supports_partial_text_matching?) &&
-        search_strategy.supports_partial_text_matching?
+      false
     end
 
     #
@@ -124,17 +112,13 @@ module RawLine
     def back(options={})
       return nil unless length > 0
 
-      if search_strategy
-        @position = search_strategy.search_backward(options.merge(history:self)) || @position
+      case @position
+      when nil then
+        @position = length-1
+      when 0 then
+        @position = length-1 if @cycle
       else
-        case @position
-        when nil then
-          @position = length-1
-        when 0 then
-          @position = length-1 if @cycle
-        else
-          @position -= 1
-        end
+        @position -= 1
       end
     end
 
@@ -154,17 +138,13 @@ module RawLine
     def forward(options={})
       return nil unless length > 0
 
-      if search_strategy
-        @position = search_strategy.search_forward(options.merge(history:self)) || @position
+      case @position
+      when nil then
+        nil
+      when length-1 then
+        @position = 0 if @cycle
       else
-        case @position
-        when nil then
-          nil
-        when length-1 then
-          @position = 0 if @cycle
-        else
-          @position += 1
-        end
+        @position += 1
       end
     end
 
