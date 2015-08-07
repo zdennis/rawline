@@ -1,5 +1,8 @@
 #!usr/bin/env ruby
 
+require 'io/console'
+require 'ostruct'
+
 #
 #  terminal.rb
 #
@@ -66,6 +69,21 @@ module RawLine
       @escape_codes = []
       @escape_sequences = []
       update
+    end
+
+    CursorPosition = Struct.new(:column, :row)
+
+    def cursor_position
+      res = ''
+      $stdin.raw do |stdin|
+        $stdout << "\e[6n"
+        $stdout.flush
+        while (c = stdin.getc) != 'R'
+          res << c if c
+        end
+      end
+      m = res.match /(?<row>\d+);(?<column>\d+)/
+      CursorPosition.new(Integer(m[:column]), Integer(m[:row]))
     end
 
     #

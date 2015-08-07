@@ -42,8 +42,9 @@ module RawLine
     attr_accessor :completion_proc, :line, :history, :completion_append_string
     attr_accessor :match_hidden_files, :completion_matches
     attr_accessor :word_break_characters
+    attr_reader :output
 
-    def_delegators :@output, :puts
+    def_delegators :@output, :puts, :print
 
     #
     # Create an instance of RawLine::Editor which can be used
@@ -501,6 +502,11 @@ module RawLine
       (@line.length - @line.position).times { @output.putc ?\b.ord }
     end
 
+    def clear_screen_down
+      t = TermInfo.new(ENV["TERM"], @output)
+      t.control "ed"
+    end
+
     #
     # Undo the last modification to the current line (<tt>@line.text</tt>).
     # This action is bound to ctrl+z by default.
@@ -572,6 +578,8 @@ module RawLine
     #
     def overwrite_line(new_line, position=nil, options={})
       pos = position || new_line.length
+
+      clear_screen_down
 
       # determine the number of lines we need to delete before we can cleanly
       # overwrite
@@ -788,6 +796,14 @@ module RawLine
 
       def terminal_width
         terminal_size[0]
+      end
+
+      def terminal_height
+        terminal_size[1]
+      end
+
+      def cursor_position
+        terminal.cursor_position
       end
     end
   end
