@@ -652,6 +652,7 @@ module RawLine
       rows_to_move_down = number_of_terminal_rows - current_terminal_row
       @terminal.move_down_n_rows rows_to_move_down
       @line.position = @line.length
+      @terminal.move_to_column((@line.prompt.length + @line.position) % terminal_width)
     end
 
     private
