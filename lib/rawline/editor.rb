@@ -131,7 +131,7 @@ module RawLine
         @ignore_position_change = false
         break if @char == @terminal.keys[:enter] || !@char
       end
-      move_to_position @line.length
+      move_to_end_of_line
       @output.print "\n"
       @line.text
     end
@@ -496,16 +496,14 @@ module RawLine
     end
 
     def clear_screen
-      t = TermInfo.new(ENV["TERM"], @output)
-      t.control "clear"
+      @terminal.clear_screen
       @output.print @line.prompt
       @output.print @line.text
       (@line.length - @line.position).times { @output.putc ?\b.ord }
     end
 
     def clear_screen_down
-      t = TermInfo.new(ENV["TERM"], @output)
-      t.control "ed"
+      @terminal.clear_screen_down
     end
 
     #
@@ -572,6 +570,18 @@ module RawLine
       end
     end
 
+    def terminal_row_for_line_position(line_position)
+      ((@line.prompt.length + line_position) / terminal_width.to_f).ceil
+    end
+
+    def current_terminal_row
+      ((@line.position + @line.prompt.length + 1) / terminal_width.to_f).ceil
+    end
+
+    def number_of_terminal_rows
+      ((@line.length + @line.prompt.length) / terminal_width.to_f).ceil
+    end
+
     #
     # Overwrite the current line (<tt>@line.text</tt>)
     # with <tt>new_line</tt>, and optionally reset the cursor position to
@@ -582,10 +592,10 @@ module RawLine
 
       clear_screen_down
 
-      # determine the number of lines we need to delete before we can cleanly
-      # overwrite
       number_of_lines = (@line.position + @line.prompt.length) / terminal_width
 
+      # determine the number of lines we need to delete before we can cleanly
+      # overwrite
       escape "\e[1K"
       number_of_lines.times {
         escape "\e[A\e[#{terminal_width}C\e[1K"
@@ -628,14 +638,20 @@ module RawLine
     # Move the cursor to <tt>pos</tt>.
     #
     def move_to_position(pos)
-      n = pos-@line.position
-      case
-      when n > 0 then
-        n.times { move_right }
-      when n < 0 then
-        n.abs.times {move_left}
-      when n == 0 then
+      rows_to_move = current_terminal_row - terminal_row_for_line_position(pos)
+      if rows_to_move > 0
+        @terminal.move_up_n_rows(rows_to_move)
+      else
+        @terminal.move_down_n_rows(rows_to_move.abs)
       end
+      @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
+      @line.position = pos
+    end
+
+    def move_to_end_of_line
+      rows_to_move_down = number_of_terminal_rows - current_terminal_row
+      @terminal.move_down_n_rows rows_to_move_down
+      @line.position = @line.length
     end
 
     private

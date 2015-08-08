@@ -86,6 +86,26 @@ module RawLine
       CursorPosition.new(Integer(m[:column]), Integer(m[:row]))
     end
 
+    def clear_screen
+      term_info.control "clear"
+    end
+
+    def clear_screen_down
+      term_info.control "ed"
+    end
+
+    def move_to_column(n)
+      term_info.control "hpa", n
+    end
+
+    def move_up_n_rows(n)
+      n.times { term_info.control "cuu1" }
+    end
+
+    def move_down_n_rows(n)
+      n.times { term_info.control "cud1" }
+    end
+
     #
     # Update the terminal escape sequences. This method is called automatically
     # by RawLine::Editor#bind().
@@ -97,6 +117,12 @@ module RawLine
           @escape_sequences << k unless @escape_sequences.include? k
         end
       end
+    end
+
+    private
+
+    def term_info
+      @term_info ||= TermInfo.new(ENV["TERM"], $stdout)
     end
 
   end
