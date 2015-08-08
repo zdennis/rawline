@@ -131,6 +131,7 @@ module RawLine
         @ignore_position_change = false
         break if @char == @terminal.keys[:enter] || !@char
       end
+      move_to_position @line.length
       @output.print "\n"
       @line.text
     end
