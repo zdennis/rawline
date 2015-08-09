@@ -86,12 +86,36 @@ module RawLine
       CursorPosition.new(Integer(m[:column]), Integer(m[:row]))
     end
 
+    def clear_to_beginning_of_line
+      term_info.control "el1"
+    end
+
     def clear_screen
       term_info.control "clear"
     end
 
     def clear_screen_down
       term_info.control "ed"
+    end
+
+    def move_to_beginning_of_row
+      move_to_column 0
+    end
+
+    def move_left
+      move_left_n_characters 1
+    end
+
+    def move_left_n_characters(n)
+      term_info.control "cub1"
+    end
+
+    def move_right_n_characters(n)
+      term_info.control "cuf1"
+    end
+
+    def move_to_column_and_row(column, row)
+      term_info.control "cup", column, row
     end
 
     def move_to_column(n)
@@ -104,6 +128,13 @@ module RawLine
 
     def move_down_n_rows(n)
       n.times { term_info.control "cud1" }
+    end
+
+    def preserve_cursor(&blk)
+      term_info.control "sc" # store cursor position
+      blk.call
+    ensure
+      term_info.control "rc" # restore cursor position
     end
 
     #
