@@ -101,6 +101,27 @@ module RawLine
       "RawLine v#{RawLine.rawline_version}"
     end
 
+    def prompt
+      @line.prompt if @line
+    end
+
+    def prompt=(text)
+      return if !@allow_prompt_updates || @line.nil? || @line.prompt == text
+
+      old_prompt = @line.prompt
+      new_prompt = Prompt.new(text)
+      line_position = @line.position
+
+      move_to_position 0
+
+      @terminal.move_to_column old_prompt.length
+      @terminal.clear_to_beginning_of_line
+      @terminal.move_to_beginning_of_row
+
+      @line.prompt = new_prompt
+      overwrite_line @line.text, line_position
+    end
+
     #
     # Read characters from <tt>@input</tt> until the user presses ENTER
     # (use it in the same way as you'd use IO#gets)
@@ -117,6 +138,7 @@ module RawLine
         l.word_separator = @word_separator
       end
       add_to_line_history
+      @allow_prompt_updates = true
       loop do
         old_position = @line.position
 
@@ -131,6 +153,7 @@ module RawLine
         @ignore_position_change = false
         break if @char == @terminal.keys[:enter] || !@char
       end
+      @allow_prompt_updates = false
       move_to_end_of_line
       @output.print "\n"
       @line.text
@@ -653,6 +676,14 @@ module RawLine
       @terminal.move_down_n_rows rows_to_move_down
       @line.position = @line.length
       @terminal.move_to_column((@line.prompt.length + @line.position) % terminal_width)
+    end
+
+    def move_up_n_lines(n)
+      @terminal.move_up_n_rows(n)
+    end
+
+    def move_down_n_lines(n)
+      @terminal.move_down_n_rows(n)
     end
 
     private
