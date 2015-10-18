@@ -44,7 +44,80 @@ module RawLine
     attr_accessor :word_break_characters
     attr_reader :output
 
-    def_delegators :@output, :puts, :print
+    class AsynchronousOut
+      def initialize(output)
+        @output = output
+        @mutex = Mutex.new
+        @events = []
+
+        @synchronous = true
+        event_loop
+      end
+
+      def method_missing(name, *args)
+        if @synchronous
+          $z.puts "SynchReceived: #{name} with #{args.inspect}"
+          @output.send name, *args
+        elsif @inside_atomic_section
+          $z.puts "AtomicAdd: #{name.inspect} args: #{args.inspect}"
+          @events.push [name, *args]
+        else
+          @mutex.synchronize {
+            $z.puts "AsyncAdd: #{name.inspect} args: #{args.inspect}"
+            @events.push [name, *args]
+            @thr.wakeup if @thr
+          }
+        end
+      end
+
+      def event_loop
+        @thr = Thread.new do
+          loop do
+            # sleep 0.01
+            while event=@events.shift
+              $z.puts "AsyncReceived: #{event[0]} with #{event[1..-1].inspect}"
+              @output.send event[0], *event[1..-1]
+            end
+            Thread.stop
+          end
+        end
+        @thr.abort_on_exception = true
+      end
+
+      def synchronize(&blk)
+        if @inside_atomic_section == Thread.current
+          yield
+        else
+          @mutex.synchronize {
+            begin
+              @inside_atomic_section = Thread.current
+              yield
+            ensure
+              @inside_atomic_section = false
+            end
+          }
+        end
+      end
+    end
+
+    def puts(*args)
+      @output.puts *args
+    end
+
+    def print(*args)
+      @output.print *args
+    end
+
+    def preserve_cursor(&blk)
+      @output.synchronize do
+        begin
+          @output.print @terminal.term_info.control_string("sc")
+          blk.call
+        ensure
+          @output.print @terminal.term_info.control_string("rc")
+        end
+      end
+    end
 
     #
     # Create an instance of RawLine::Editor which can be used
@@ -63,7 +136,7 @@ module RawLine
     #
     def initialize(input=STDIN, output=STDOUT)
       @input = input
-      @output = output
+      @output = AsynchronousOut.new(output)
       case RUBY_PLATFORM
       when /mswin/i then
         @terminal = WindowsTerminal.new
@@ -114,9 +187,14 @@ module RawLine
 
       move_to_position 0
 
-      @terminal.move_to_column old_prompt.length
-      @terminal.clear_to_beginning_of_line
-      @terminal.move_to_beginning_of_row
+      @output.print @terminal.term_info.control_string("hp1", old_prompt.length)
+      # @terminal.move_to_column old_prompt.length
+
+      @output.print @terminal.term_info.control_string("el1")
+      # @terminal.clear_to_beginning_of_line
+
+      @output.print @terminal.term_info.control_string("hp1", 0)
+      # @terminal.move_to_beginning_of_row
 
       @line.prompt = new_prompt
       overwrite_line @line.text, line_position
@@ -519,14 +597,16 @@ module RawLine
     end
 
     def clear_screen
-      @terminal.clear_screen
+      @output.print @terminal.term_info.control_string("clear")
+      # @terminal.clear_screen
       @output.print @line.prompt
       @output.print @line.text
       (@line.length - @line.position).times { @output.putc ?\b.ord }
     end
 
     def clear_screen_down
-      @terminal.clear_screen_down
+      @output.print @terminal.term_info.control_string("ed")
+      # @terminal.clear_screen_down
     end
 
     #
@@ -663,27 +743,37 @@ module RawLine
     def move_to_position(pos)
       rows_to_move = current_terminal_row - terminal_row_for_line_position(pos)
       if rows_to_move > 0
-        @terminal.move_up_n_rows(rows_to_move)
+        rows_to_move.times { @output.print @terminal.term_info.control_string("cuu1") }
+        # @terminal.move_up_n_rows(rows_to_move)
       else
-        @terminal.move_down_n_rows(rows_to_move.abs)
+        rows_to_move.abs.times { @output.print @terminal.term_info.control_string("cud1") }
+        # @terminal.move_down_n_rows(rows_to_move.abs)
       end
-      @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
+      column = (@line.prompt.length + pos) % terminal_width
+      @output.print @terminal.term_info.control_string("hpa", column)
+      # @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
       @line.position = pos
     end
 
     def move_to_end_of_line
       rows_to_move_down = number_of_terminal_rows - current_terminal_row
-      @terminal.move_down_n_rows rows_to_move_down
+      rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
+      # @terminal.move_down_n_rows rows_to_move_down
       @line.position = @line.length
-      @terminal.move_to_column((@line.prompt.length + @line.position) % terminal_width)
+
+      column = (@line.prompt.length + @line.position) % terminal_width
+      @output.print @terminal.term_info.control_string("hpa", column)
+      # @terminal.move_to_column((@line.prompt.length + @line.position) % terminal_width)
     end
 
     def move_up_n_lines(n)
-      @terminal.move_up_n_rows(n)
+      n.times { @output.print @terminal.term_info.control_string("cuu1") }
+      # @terminal.move_up_n_rows(n)
     end
 
     def move_down_n_lines(n)
-      @terminal.move_down_n_rows(n)
+      n.times { @output.print @terminal.term_info.control_string("cud1") }
+      # @terminal.move_down_n_rows(n)
     end
 
     private

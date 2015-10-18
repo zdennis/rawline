@@ -150,8 +150,6 @@ module RawLine
       end
     end
 
-    private
-
     def term_info
       @term_info ||= TermInfo.new(ENV["TERM"], $stdout)
     end
