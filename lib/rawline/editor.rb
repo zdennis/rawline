@@ -10,6 +10,9 @@
 #
 
 require 'forwardable'
+require 'terminal_layout'
+require 'ansi_string'
+require 'term/ansicolor'
 
 module RawLine
 
@@ -43,80 +46,28 @@ module RawLine
     attr_accessor :match_hidden_files, :completion_matches
     attr_accessor :word_break_characters
     attr_reader :output
+    attr_accessor :dom
 
-    class AsynchronousOut
-      def initialize(output)
-        @output = output
-        @mutex = Mutex.new
-        @events = []
-
-        @synchronous = true
-        event_loop
-      end
-
-      def method_missing(name, *args)
-        if @synchronous
-          $z.puts "SynchReceived: #{name} with #{args.inspect}"
-          @output.send name, *args
-        elsif @inside_atomic_section
-          $z.puts "AtomicAdd: #{name.inspect} args: #{args.inspect}"
-          @events.push [name, *args]
-        else
-          @mutex.synchronize {
-            $z.puts "AsyncAdd: #{name.inspect} args: #{args.inspect}"
-            @events.push [name, *args]
-            @thr.wakeup if @thr
-          }
-        end
-      end
-
-      def event_loop
-        @thr = Thread.new do
-          loop do
-            # sleep 0.01
-            while event=@events.shift
-              $z.puts "AsyncReceived: #{event[0]} with #{event[1..-1].inspect}"
-              @output.send event[0], *event[1..-1]
-            end
-            Thread.stop
-          end
-        end
-        @thr.abort_on_exception = true
-      end
-
-      def synchronize(&blk)
-        if @inside_atomic_section == Thread.current
-          yield
-        else
-          @mutex.synchronize {
-            begin
-              @inside_atomic_section = Thread.current
-              yield
-            ensure
-              @inside_atomic_section = false
-            end
-          }
-        end
-      end
-    end
+    # TODO: dom traversal for lookup rather than assignment
+    attr_accessor :prompt_box, :input_box
 
     def puts(*args)
-      @output.puts *args
+      # @output.puts *args
     end
 
     def print(*args)
-      @output.print *args
+      # @output.print *args
     end
 
     def preserve_cursor(&blk)
-      @output.synchronize do
+      # @output.synchronize do
         begin
-          @output.print @terminal.term_info.control_string("sc")
+          # @output.print @terminal.term_info.control_string("sc")
           blk.call
         ensure
-          @output.print @terminal.term_info.control_string("rc")
+          # @output.print @terminal.term_info.control_string("rc")
         end
-      end
+      # end
     end
 
     #
@@ -136,7 +87,8 @@ module RawLine
     #
     def initialize(input=STDIN, output=STDOUT)
       @input = input
-      @output = AsynchronousOut.new(output)
+      # @output = output
+
       case RUBY_PLATFORM
       when /mswin/i then
         @terminal = WindowsTerminal.new
@@ -167,6 +119,10 @@ module RawLine
       @char = nil
     end
 
+    def dom
+      @dom ||= build_dom_tree
+    end
+
     #
     # Return the current RawLine version
     #
@@ -181,23 +137,25 @@ module RawLine
     def prompt=(text)
       return if !@allow_prompt_updates || @line.nil? || @line.prompt == text
 
-      old_prompt = @line.prompt
-      new_prompt = Prompt.new(text)
-      line_position = @line.position
-
-      move_to_position 0
-
-      @output.print @terminal.term_info.control_string("hp1", old_prompt.length)
-      # @terminal.move_to_column old_prompt.length
-
-      @output.print @terminal.term_info.control_string("el1")
-      # @terminal.clear_to_beginning_of_line
-
-      @output.print @terminal.term_info.control_string("hp1", 0)
-      # @terminal.move_to_beginning_of_row
-
-      @line.prompt = new_prompt
-      overwrite_line @line.text, line_position
+      @prompt_box.content = Prompt.new(text)
+      #
+      # old_prompt = @line.prompt
+      # new_prompt = Prompt.new(text)
+      # line_position = @line.position
+      #
+      # move_to_position 0
+      #
+      # # @output.print @terminal.term_info.control_string("hp1", old_prompt.length)
+      # # @terminal.move_to_column old_prompt.length
+      #
+      # # @output.print @terminal.term_info.control_string("el1")
+      # # @terminal.clear_to_beginning_of_line
+      #
+      # # @output.print @terminal.term_info.control_string("hp1", 0)
+      # # @terminal.move_to_beginning_of_row
+      #
+      # @line.prompt = new_prompt
+      # overwrite_line @line.text, line_position
     end
 
     #
@@ -207,9 +165,10 @@ module RawLine
     # * An optional flag can be specified to enable/disable editor history (false)
     #
     def read(prompt="", add_history=false)
+      start_render
       prompt = Prompt.new(prompt)
+      @prompt_box.content = prompt
       update_word_separator
-      @output.print prompt if prompt != ""
       @add_history = add_history
       @line = Line.new(@line_history_size) do |l|
         l.prompt = prompt
@@ -233,7 +192,11 @@ module RawLine
       end
       @allow_prompt_updates = false
       move_to_end_of_line
-      @output.print "\n"
+      # @output.print "\n"
+
+      @terminal_renderer.reset(@render_tree)
+      @input_box.content = ""
+
       @line.text
     end
 
@@ -246,15 +209,21 @@ module RawLine
     alias completer_word_break_characters word_break_characters
     alias completer_word_break_characters= word_break_characters=
 
-      #
-      # Read and parse a character from <tt>@input</tt>.
-      # This method is called automatically by <tt>read</tt>
-      #
-      def read_character
-        @output.flush
-        c = get_character(@input).ord rescue nil
-        @char = parse_key_code(c) || c
+    #
+    # Read and parse a character from <tt>@input</tt>.
+    # This method is called automatically by <tt>read</tt>
+    #
+    def read_character
+      # @output.flush
+      begin
+        c = get_character(@input).ord
+      rescue Exception => ex
+        $z.puts ex.message
+        $z.puts ex.backtrace
+        nil
       end
+      @char = parse_key_code(c) || c
+    end
 
     #
     #  Parse a key or key sequence into the corresponding codes.
@@ -277,7 +246,7 @@ module RawLine
     end
 
     #
-    # Write a string to <tt>@output</tt> starting from the cursor position.
+    # Write a string to <tt># @output</tt> starting from the cursor position.
     # Characters at the right of the cursor are shifted to the right if
     # <tt>@mode == :insert</tt>, deleted otherwise.
     #
@@ -287,12 +256,12 @@ module RawLine
     end
 
     #
-    #  Write a new line to <tt>@output</tt>, overwriting any existing text
+    #  Write a new line to <tt># @output</tt>, overwriting any existing text
     #  and printing an end of line character.
     #
     def write_line(string)
       clear_line
-      @output.print string
+      # @output.print string
       @line.text = string
       add_to_line_history
       add_to_history
@@ -377,11 +346,12 @@ module RawLine
     # This method is called automatically by <tt>process_character</tt>.
     #
     def default_action
+      @input_box.content += @char.chr
       print_character
     end
 
     #
-    # Write a character to <tt>@output</tt> at cursor position,
+    # Write a character to <tt># @output</tt> at cursor position,
     # shifting characters as appropriate.
     # If <tt>no_line_history</tt> is set to <tt>true</tt>, the updated
     # won't be saved in the history of the current line.
@@ -389,18 +359,16 @@ module RawLine
     def print_character(char=@char, no_line_history = false)
       if @line.position < @line.length then
         chars = select_characters_from_cursor if @mode == :insert
-        @output.putc char
         @line.text[@line.position] = (@mode == :insert) ? "#{char.chr}#{@line.text[@line.position].chr}" : "#{char.chr}"
         @line.right
-        if @mode == :insert then
-          raw_print chars
-          chars.length.times { @output.putc ?\b.ord } # move cursor back
-        end
+        # if @mode == :insert then
+        #   chars.length.times { @line.left } # move cursor back
+        # end
       else
-        @output.putc char
         @line.right
         @line << char
       end
+      @input_box.content = @line.text
       add_to_line_history unless no_line_history
     end
 
@@ -487,7 +455,7 @@ module RawLine
     #
     def move_left
       unless @line.bol? then
-        @output.putc ?\b.ord
+        # @output.putc ?\b.ord
         @line.left
         return true
       end
@@ -503,7 +471,7 @@ module RawLine
     def move_right
       unless @line.position > @line.eol then
         @line.right
-        @output.putc @line.text[@line.position-1]
+        # @output.putc @line.text[@line.position-1]
         return true
       end
       false
@@ -517,12 +485,12 @@ module RawLine
       pos = @line.position
       text = @line.text
       word = @line.word
-      @output.puts
-      @output.puts "Text: [#{text}]"
-      @output.puts "Length: #{@line.length}"
-      @output.puts "Position: #{pos}"
-      @output.puts "Character at Position: [#{text[pos].chr}] (#{text[pos]})" unless pos >= @line.length
-      @output.puts "Current Word: [#{word[:text]}] (#{word[:start]} -- #{word[:end]})"
+      # @output.puts
+      # @output.puts "Text: [#{text}]"
+      # @output.puts "Length: #{@line.length}"
+      # @output.puts "Position: #{pos}"
+      # @output.puts "Character at Position: [#{text[pos].chr}] (#{text[pos]})" unless pos >= @line.length
+      # @output.puts "Current Word: [#{word[:text]}] (#{word[:start]} -- #{word[:end]})"
       clear_line
       raw_print text
       overwrite_line(text, pos)
@@ -535,8 +503,8 @@ module RawLine
     def show_history
       pos = @line.position
       text = @line.text
-      @output.puts
-      @output.puts "History:"
+      # @output.puts
+      # @output.puts "History:"
       @history.each {|l| puts "- [#{l}]"}
       overwrite_line(text, pos)
     end
@@ -571,11 +539,10 @@ module RawLine
         # save characters to shift
         chars = (@line.eol?) ? ' ' : select_characters_from_cursor(1)
         # remove character from console and shift characters
-        raw_print chars
-        @output.putc ?\s.ord
-        (chars.length+1).times { @output.putc ?\b.ord }
+        # (chars.length+1).times { # @output.putc ?\b.ord }
         #remove character from line
         @line[@line.position] = ''
+        @input_box.content = @line.text
         add_to_line_history unless no_line_history
       end
     end
@@ -586,10 +553,10 @@ module RawLine
     # This action is bound to ctrl+k by default.
     #
     def clear_line
-      @output.putc ?\r
-      @output.print @line.prompt
-      @line.length.times { @output.putc ?\s.ord }
-      @line.length.times { @output.putc ?\b.ord }
+      # @output.putc ?\r
+      # @output.print @line.prompt
+      # @line.length.times {  @output.putc ?\s.ord }
+      # @line.length.times {  @output.putc ?\b.ord }
       add_to_line_history
       @line.text = ""
       @line.position = 0
@@ -597,15 +564,15 @@ module RawLine
     end
 
     def clear_screen
-      @output.print @terminal.term_info.control_string("clear")
+      # @output.print @terminal.term_info.control_string("clear")
       # @terminal.clear_screen
-      @output.print @line.prompt
-      @output.print @line.text
-      (@line.length - @line.position).times { @output.putc ?\b.ord }
+      # @output.print @line.prompt
+      # @output.print @line.text
+      # (@line.length - @line.position).times {  @output.putc ?\b.ord }
     end
 
     def clear_screen_down
-      @output.print @terminal.term_info.control_string("ed")
+      # @output.print @terminal.term_info.control_string("ed")
       # @terminal.clear_screen_down
     end
 
@@ -685,6 +652,19 @@ module RawLine
       ((@line.length + @line.prompt.length) / terminal_width.to_f).ceil
     end
 
+    def kill_forward
+      @line.text[@line.position..-1].tap do
+        @line[line.position..-1] = ""
+        @input_box.content = line.text
+      end
+    end
+
+    def yank_forward(text)
+      @line.text[line.position] = text
+      @line.position = line.position + text.length
+      @input_box.content = line.text
+    end
+
     #
     # Overwrite the current line (<tt>@line.text</tt>)
     # with <tt>new_line</tt>, and optionally reset the cursor position to
@@ -705,8 +685,8 @@ module RawLine
       }
 
       text = @line.text
-      @output.putc ?\r.ord
-      @output.print @line.prompt
+      # @output.putc ?\r.ord
+      # @output.print @line.prompt
 
       if options[:highlight_up_to]
         @highlighting = true
@@ -718,8 +698,8 @@ module RawLine
 
       n = text.length-new_line.length+1
       if n > 0
-        n.times { @output.putc ?\s.ord }
-        n.times { @output.putc ?\b.ord }
+        # n.times { @output.putc ?\s.ord }
+        # n.times { @output.putc ?\b.ord }
       end
       @ignore_position_change = true
       @line.position = new_line.length
@@ -737,46 +717,74 @@ module RawLine
       }.join
     end
 
+    def move_to_beginning_of_input
+      @line.position = @line.bol
+    end
+
+    def move_to_end_of_input
+      @line.position = @line.length
+    end
+
     #
     # Move the cursor to <tt>pos</tt>.
     #
     def move_to_position(pos)
       rows_to_move = current_terminal_row - terminal_row_for_line_position(pos)
       if rows_to_move > 0
-        rows_to_move.times { @output.print @terminal.term_info.control_string("cuu1") }
+        # rows_to_move.times { @output.print @terminal.term_info.control_string("cuu1") }
         # @terminal.move_up_n_rows(rows_to_move)
       else
-        rows_to_move.abs.times { @output.print @terminal.term_info.control_string("cud1") }
+        # rows_to_move.abs.times { @output.print @terminal.term_info.control_string("cud1") }
         # @terminal.move_down_n_rows(rows_to_move.abs)
       end
       column = (@line.prompt.length + pos) % terminal_width
-      @output.print @terminal.term_info.control_string("hpa", column)
+      # @output.print @terminal.term_info.control_string("hpa", column)
       # @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
       @line.position = pos
     end
 
     def move_to_end_of_line
       rows_to_move_down = number_of_terminal_rows - current_terminal_row
-      rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
+      # rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
       # @terminal.move_down_n_rows rows_to_move_down
       @line.position = @line.length
 
       column = (@line.prompt.length + @line.position) % terminal_width
-      @output.print @terminal.term_info.control_string("hpa", column)
+      # @output.print @terminal.term_info.control_string("hpa", column)
       # @terminal.move_to_column((@line.prompt.length + @line.position) % terminal_width)
     end
 
     def move_up_n_lines(n)
-      n.times { @output.print @terminal.term_info.control_string("cuu1") }
+      # n.times { @output.print @terminal.term_info.control_string("cuu1") }
       # @terminal.move_up_n_rows(n)
     end
 
     def move_down_n_lines(n)
-      n.times { @output.print @terminal.term_info.control_string("cud1") }
+      # n.times { @output.print @terminal.term_info.control_string("cud1") }
       # @terminal.move_down_n_rows(n)
     end
 
     private
+
+    def build_dom_tree
+      @prompt_box = TerminalLayout::Box.new(content: "default-prompt>", style: {display: :inline})
+      @input_box = TerminalLayout::InputBox.new(content: "", style: {display: :inline})
+      TerminalLayout::Box.new(children:[@prompt_box, @input_box])
+    end
+
+    def start_render
+      @render_tree ||= begin
+        @terminal_renderer = TerminalLayout::TerminalRenderer.new(output: $stdout)
+        TerminalLayout::RenderTree.new(
+          dom,
+          parent: nil,
+          style: { width:terminal_width, height:terminal_height },
+          renderer: @terminal_renderer
+        ).tap do |dom|
+          dom.layout
+        end
+      end
+    end
 
     def update_word_separator
       return @word_separator = "" if @word_break_characters.to_s == ""
@@ -813,7 +821,7 @@ module RawLine
     end
 
     def raw_print(string)
-      string.each_byte { |c| @output.putc c }
+      # string.each_byte { |c| @output.putc c }
     end
 
     def generic_history_back(history)
@@ -896,7 +904,7 @@ module RawLine
         end
       else
         def escape(string)
-          @output.print string
+          # @output.print string
         end
       end
 

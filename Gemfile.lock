@@ -3,6 +3,7 @@ PATH
   specs:
     rawline (0.3.2)
       highline (>= 1.7.2)
+      terminal-layout (>= 0.1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -22,6 +23,7 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.3.0)
     rspec-support (3.3.0)
+    terminal-layout (0.1.0)
 
 PLATFORMS
   ruby
