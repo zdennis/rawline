@@ -117,10 +117,23 @@ module RawLine
       yield self if block_given?
       update_word_separator
       @char = nil
+
+      @event_registry = Rawline::EventRegistry.new do |registry|
+        registry.subscribe :default, -> (_) { self.check_for_keyboard_input }
+        registry.subscribe :dom_tree_change, -> (_) { self.render }
+      end
+      @event_loop = Rawline::EventLoop.new(registry: @event_registry)
+
+      @dom ||= build_dom_tree
+      @renderer ||= build_renderer
+
+      initialize_line
     end
 
-    def dom
-      @dom ||= build_dom_tree
+    attr_reader :dom
+
+    def events
+      @event_loop
     end
 
     #
@@ -136,51 +149,36 @@ module RawLine
 
     def prompt=(text)
       return if !@allow_prompt_updates || @line.nil? || @line.prompt == text
-
       @prompt_box.content = Prompt.new(text)
-      #
-      # old_prompt = @line.prompt
-      # new_prompt = Prompt.new(text)
-      # line_position = @line.position
-      #
-      # move_to_position 0
-      #
-      # # @output.print @terminal.term_info.control_string("hp1", old_prompt.length)
-      # # @terminal.move_to_column old_prompt.length
-      #
-      # # @output.print @terminal.term_info.control_string("el1")
-      # # @terminal.clear_to_beginning_of_line
-      #
-      # # @output.print @terminal.term_info.control_string("hp1", 0)
-      # # @terminal.move_to_beginning_of_row
-      #
-      # @line.prompt = new_prompt
-      # overwrite_line @line.text, line_position
     end
 
-    #
-    # Read characters from <tt>@input</tt> until the user presses ENTER
-    # (use it in the same way as you'd use IO#gets)
-    # * An optional prompt can be specified to be printed at the beginning of the line ("").
-    # * An optional flag can be specified to enable/disable editor history (false)
-    #
-    def read(prompt="", add_history=false)
-      start_render
-      prompt = Prompt.new(prompt)
-      @prompt_box.content = prompt
+    def initialize_line
+      @input_box.content = ""
       update_word_separator
-      @add_history = add_history
+      @add_history = true #add_history
       @line = Line.new(@line_history_size) do |l|
-        l.prompt = prompt
+        l.prompt = @prompt_box.content
         l.word_separator = @word_separator
       end
       add_to_line_history
       @allow_prompt_updates = true
-      loop do
-        old_position = @line.position
+    end
 
-        read_character
+    def reset_line
+      initialize_line
+      render(reset: true)
+    end
+
+    def check_for_keyboard_input
+      begin
+        old_position = @line.position
+        byte = @input.read_nonblock(1)
+
+        c = byte.ord
+        @char = parse_key_code(c) || c
+
         process_character
+
         new_position = @line.position
 
         if !@ignore_position_change && new_position != old_position
@@ -188,20 +186,34 @@ module RawLine
         end
 
         @ignore_position_change = false
-        break if @char == @terminal.keys[:enter] || !@char
+        if @char == @terminal.keys[:enter] || !@char
+          @allow_prompt_updates = false
+          move_to_end_of_line
+          @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.dup }
+        end
+      rescue IO::WaitReadable
+        IO.select([@input], [], [], 0.01)
+        @event_loop.add_event name: 'check_for_keyboard_input', source: self
       end
-      @allow_prompt_updates = false
-      move_to_end_of_line
-      # @output.print "\n"
+    end
 
-      @terminal_renderer.reset(@render_tree)
-      @input_box.content = ""
+    def on_read_line(&blk)
+      @event_registry.subscribe :line_read, &blk
+    end
 
-      @line.text
+    def start
+      @input.raw!
+      at_exit { @input.cooked! }
+
+      @event_loop.add_event name: "render", source: self
+      @event_loop.start
+    end
+
+    def subscribe(*args, &blk)
+      @event_registry.subscribe(*args, &blk)
     end
 
     # Readline compatibility aliases
-    alias readline read
     alias completion_append_character completion_append_string
     alias completion_append_character= completion_append_string=
     alias basic_word_break_characters word_break_characters
@@ -210,23 +222,7 @@ module RawLine
     alias completer_word_break_characters= word_break_characters=
 
     #
-    # Read and parse a character from <tt>@input</tt>.
-    # This method is called automatically by <tt>read</tt>
-    #
-    def read_character
-      # @output.flush
-      begin
-        c = get_character(@input).ord
-      rescue Exception => ex
-        $z.puts ex.message
-        $z.puts ex.backtrace
-        nil
-      end
-      @char = parse_key_code(c) || c
-    end
-
-    #
-    #  Parse a key or key sequence into the corresponding codes.
+    # Parse a key or key sequence into the corresponding codes.
     # This method is called automatically by <tt>read_character</tt>
     #
     def parse_key_code(code)
@@ -234,6 +230,7 @@ module RawLine
         sequence = [code]
         seqs = []
         loop do
+          # TODO: this own't work, i'm not sure why this woudl ever be hit anyways
           c = get_character(@input).ord rescue nil
           sequence << c
           seqs = @terminal.escape_sequences.select { |e| e[0..sequence.length-1] == sequence }
@@ -772,18 +769,29 @@ module RawLine
       TerminalLayout::Box.new(children:[@prompt_box, @input_box])
     end
 
-    def start_render
-      @render_tree ||= begin
-        @terminal_renderer = TerminalLayout::TerminalRenderer.new(output: $stdout)
-        TerminalLayout::RenderTree.new(
-          dom,
-          parent: nil,
-          style: { width:terminal_width, height:terminal_height },
-          renderer: @terminal_renderer
-        ).tap do |dom|
-          dom.layout
-        end
+    def build_renderer
+      @renderer = TerminalLayout::TerminalRenderer.new(output: $stdout)
+      @render_tree = TerminalLayout::RenderTree.new(
+        @dom,
+        parent: nil,
+        style: { width:terminal_width, height:terminal_height },
+        renderer: @renderer
+      )
+
+      @dom.on(:child_changed) do |*args|
+        @event_loop.add_event name: "render", source: @dom#, target: event[:target]
       end
+
+      @event_registry.subscribe :render, -> (_) { render(reset: false) }
+
+      @renderer
+    end
+
+    def render(reset: false)
+      @render_tree.layout
+      @renderer.reset if reset
+      @renderer.render(@render_tree)
+      @event_loop.add_event name: "check_for_keyboard_input"
     end
 
     def update_word_separator
