@@ -170,10 +170,25 @@ module RawLine
     end
 
     def check_for_keyboard_input
+      bytes = []
       begin
-        old_position = @line.position
-        byte = @input.read_nonblock(1)
+        loop do
+          bytes << @input.read_nonblock(1)
+        end
+      rescue IO::WaitReadable
+        read_bytes(bytes)
 
+        IO.select([@input], [], [], 0.01)
+        @event_loop.add_event name: 'check_for_keyboard_input', source: self
+      end
+    end
+
+    def read_bytes(bytes)
+      return unless bytes.any?
+
+      old_position = @line.position
+
+      bytes.each do |byte|
         c = byte.ord
         @char = parse_key_code(c) || c
 
@@ -191,9 +206,6 @@ module RawLine
           move_to_end_of_line
           @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.dup }
         end
-      rescue IO::WaitReadable
-        IO.select([@input], [], [], 0.01)
-        @event_loop.add_event name: 'check_for_keyboard_input', source: self
       end
     end
 
@@ -880,6 +892,7 @@ module RawLine
       bind(:enter) { newline }
       bind(:tab) { complete }
       bind(:backspace) { delete_left_character }
+      bind(:ctrl_c) { raise Interrupt }
       bind(:ctrl_k) { clear_line }
       bind(:ctrl_u) { undo }
       bind(:ctrl_r) { self.redo }

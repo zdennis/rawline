@@ -13,8 +13,10 @@ module RawLine
     #  * target
     #  * payload
     def add_event(**event)
-      next_event = @events[0]
-      if next_event != event
+      # if the last event is the same as the incoming then do there is no
+      # need to add it again. For example, rendering events that already
+      # back can be squashed into a single event.
+      if @events.last != event
         @events << event
       end
     end
