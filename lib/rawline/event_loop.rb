@@ -32,7 +32,6 @@ module RawLine
     def start
       loop do
         event = @events.shift
-        $z.puts "WANT TO DISPATCH: #{event[:name]}"
         if event
           recur = event[:recur]
           if recur
@@ -46,11 +45,9 @@ module RawLine
               dispatch_event(default_event)
             end
           else
-            $z.puts "AM DISPATCH: #{event[:name]}"
             dispatch_event(event)
           end
         else
-          $z.puts "AM DISPATCH DEFAULT"
           dispatch_event(default_event)
         end
       end
