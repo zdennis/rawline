@@ -395,13 +395,14 @@ module RawLine
         char: @char,
         line: @line,
         completion: @completion_proc,
-        completion_found: -> (text) {
-          completion_found(text)
+        completion_found: -> (completion:, possible_completions:) {
+          completion_found(completion: completion, possible_completions: possible_completions)
         },
         completion_not_found: -> {
           completion_not_found
         },
         done: -> (*leftover_bytes){
+          completion_done
           leftover_bytes = leftover_bytes.flatten
           @keyboard_input_processors.pop
           if leftover_bytes.any?
@@ -413,12 +414,11 @@ module RawLine
       completer.read_bytes(@char)
     end
 
-    def completion_found(text)
+    def completion_found(completion:, possible_completions:)
       if @on_word_complete
         word = @line.word[:text]
         sub_word = @line.text[@line.word[:start]..@line.position-1] || ""
-        completion = text
-        @on_word_complete.call(name: "word-completion", payload: { sub_word: sub_word, word: word, completion: text})
+        @on_word_complete.call(name: "word-completion", payload: { sub_word: sub_word, word: word, completion: completion, possible_completions: possible_completions })
       end
 
       if @line.word[:text].length > 0
@@ -426,14 +426,20 @@ module RawLine
         move_to_position(@line.word[:end]+@completion_append_string.to_s.length+1)
       end
       (@line.position-@line.word[:start]).times { delete_left_character(true) }
-      write text+@completion_append_string.to_s
+      write completion+@completion_append_string.to_s
     end
 
     def completion_not_found
       if @on_word_complete_no_match
         word = @line.word[:text]
-        sub_word = @line.text[@line.word[:start]..@line.position-1] || ""        
+        sub_word = @line.text[@line.word[:start]..@line.position-1] || ""
         @on_word_complete_no_match.call(name: "word-completion-no-match", payload: { sub_word: sub_word, word: word })
+      end
+    end
+
+    def completion_done
+      if @on_word_complete_done
+        @on_word_complete_done.call
       end
     end
 
@@ -443,6 +449,10 @@ module RawLine
 
     def on_word_complete_no_match(&blk)
       @on_word_complete_no_match = blk
+    end
+
+    def on_word_complete_done(&blk)
+      @on_word_complete_done = blk
     end
 
     #

@@ -36,7 +36,9 @@ module RawLine
           @completion_matches.back
           match = @completion_matches.get
 
-          @completion_found_proc.call(match)
+          # completion matches is a history implementation and its in reverse order from what
+          # a user would expect
+          @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
         else
           @completion_not_found_proc.call
           @done_proc.call
@@ -45,7 +47,8 @@ module RawLine
       else
         @completion_matches.back
         match = @completion_matches.get
-        @completion_found_proc.call(match)
+
+        @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
       end
     end
 

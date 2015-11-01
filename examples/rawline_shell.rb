@@ -2,6 +2,7 @@
 
 require File.dirname(File.expand_path(__FILE__))+'/../lib/rawline'
 require 'io/console'
+require 'term/ansicolor'
 
 # puts "*** Rawline Editor Test Shell ***"
 # puts " * Press CTRL+X to exit"
@@ -154,8 +155,16 @@ end
 editor.on_word_complete do |event|
   sub_word = event[:payload][:sub_word]
   word = event[:payload][:word]
-  completion = event[:payload][:completion]
-  editor.content_box.content = "Completing #{sub_word} portion of #{word} to #{completion}"
+  actual_completion = event[:payload][:completion]
+  possible_completions =  event[:payload][:possible_completions]
+
+  editor.content_box.content = possible_completions.map do |completion|
+    if completion == actual_completion
+      Term::ANSIColor.negative(completion)
+    else
+      completion
+    end
+  end.join("  ")
 end
 
 editor.on_word_complete_no_match do |event|
@@ -168,6 +177,10 @@ editor.on_read_line do |event|
   line = event[:payload][:line]
   puts "You typed: [#{line}]"
   editor.reset_line
+end
+
+editor.on_word_complete_done do |event|
+  editor.content_box.content = ""
 end
 
 editor.start
