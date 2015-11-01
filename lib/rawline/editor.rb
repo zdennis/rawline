@@ -43,7 +43,7 @@ module RawLine
     attr_accessor :char, :history_size, :line_history_size, :highlight_history_matching_text
     attr_accessor :terminal, :keys, :mode
     attr_accessor :completion_proc, :line, :history, :completion_append_string
-    attr_accessor :match_hidden_files, :completion_matches
+    attr_accessor :match_hidden_files
     attr_accessor :word_break_characters
     attr_reader :output
     attr_accessor :dom
@@ -82,7 +82,6 @@ module RawLine
     # * <tt>@mode</tt> - The editor's character insertion mode (:insert).
     # * <tt>@completion_proc</tt> - a Proc object used to perform word completion.
     # * <tt>@completion_append_string</tt> - a string to append to completed words ('').
-    # * <tt>@completion_matches</tt> - word completion candidates.
     # * <tt>@terminal</tt> -  a RawLine::Terminal containing character key codes.
     #
     def initialize(input=STDIN, output=STDOUT)
@@ -106,7 +105,6 @@ module RawLine
       @completion_proc = filename_completion_proc
       @completion_append_string = ''
       @match_hidden_files = false
-      @completion_matches = HistoryBuffer.new(0) { |h| h.duplicates = false; h.cycle = true }
       set_default_keys
       @add_history = false
       @highlight_history_matching_text = true
@@ -114,6 +112,7 @@ module RawLine
         h.duplicates = false;
         h.exclude = lambda { |item| item.strip == "" }
       end
+      @keyboard_input_processors = [self]
       yield self if block_given?
       update_word_separator
       @char = nil
@@ -176,7 +175,7 @@ module RawLine
           bytes << @input.read_nonblock(1)
         end
       rescue IO::WaitReadable
-        read_bytes(bytes)
+        @keyboard_input_processors.last.read_bytes(bytes)
 
         IO.select([@input], [], [], 0.01)
         @event_loop.add_event name: 'check_for_keyboard_input', source: self
@@ -235,7 +234,6 @@ module RawLine
 
     #
     # Parse a key or key sequence into the corresponding codes.
-    # This method is called automatically by <tt>read_character</tt>
     #
     def parse_key_code(code)
       if @terminal.escape_codes.include? code then
@@ -393,40 +391,31 @@ module RawLine
     # pressed again.
     #
     def complete
-      completion_char = @char
-      @completion_matches.empty
-      word_start = @line.word[:start]
-      sub_word = @line.text[@line.word[:start]..@line.position-1] || ""
-      matches  = @completion_proc.call(sub_word) unless !completion_proc || @completion_proc == []
-      matches = matches.to_a.compact.sort.reverse
+      completer = Completer.new(
+        char: @char,
+        line: @line,
+        completion: @completion_proc,
+        completion_updated: -> (text) {
+          completion_updated(text)
+        },
+        done: -> (leftover_bytes){
+          @keyboard_input_processors.pop
+          if leftover_bytes
+            @keyboard_input_processors.last.read_bytes(leftover_bytes)
+          end
+        }
+      )
+      completer.read_bytes(@char)
+      @keyboard_input_processors.push(completer)
+    end
 
-      complete_word = lambda do |match|
-        unless @line.word[:text].length == 0
-          # If not in a word, print the match, otherwise continue existing word
-          move_to_position(@line.word[:end]+@completion_append_string.to_s.length+1)
-        end
-        (@line.position-word_start).times { delete_left_character(true) }
-        write match+@completion_append_string.to_s
+    def completion_updated(text)
+      if @line.word[:text].length > 0
+        # If not in a word, print the match, otherwise continue existing word
+        move_to_position(@line.word[:end]+@completion_append_string.to_s.length+1)
       end
-      unless matches.empty? then
-        @completion_matches.resize(matches.length)
-        matches.each { |w| @completion_matches << w }
-        # Get first match
-        @completion_matches.back
-        match = @completion_matches.get
-        complete_word.call(match)
-        read_character
-        while @char == completion_char do
-          # clear the current completed word so we can replace it
-          # with a new completed word
-          (@line.position - word_start).times { delete_left_character }
-          @completion_matches.back
-          match = @completion_matches.get
-          complete_word.call(match)
-          read_character
-        end
-        process_character
-      end
+      (@line.position-@line.word[:start]).times { delete_left_character(true) }
+      write text+@completion_append_string.to_s
     end
 
     #

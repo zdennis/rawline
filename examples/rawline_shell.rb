@@ -145,10 +145,9 @@ editor.bind(:ctrl_n) {
   end
 }
 
-
 editor.completion_proc = lambda do |word|
   if word
-    ['select', 'update', 'delete', 'debug', 'destroy'].find_all  { |e| e.match(/^#{Regexp.escape(word)}/) }
+    ['select', 'settle', 'seinfeld', 'sediment', 'selective', 'update', 'delete', 'debug', 'destroy'].find_all  { |e| e.match(/^#{Regexp.escape(word)}/) }
   end
 end
 
