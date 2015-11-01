@@ -216,6 +216,16 @@ module RawLine
       @input.raw!
       at_exit { @input.cooked! }
 
+      Signal.trap("SIGWINCH") do
+        @event_loop.add_event name: "terminal-resized", source: self
+      end
+
+      @event_registry.subscribe("terminal-resized") do
+        @render_tree.width = terminal_width
+        @render_tree.height = terminal_height
+        @event_loop.add_event name: "render", source: self
+      end
+
       @event_loop.add_event name: "render", source: self
       @event_loop.start
     end
