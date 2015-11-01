@@ -1,11 +1,12 @@
 module RawLine
 
   class Completer
-    def initialize(char:, line:, completion:, completion_updated:, done:)
+    def initialize(char:, line:, completion:, completion_found:, completion_not_found:, done:)
       @completion_char = char
       @line = line
       @completion_proc = completion
-      @completion_updated_proc = completion_updated
+      @completion_found_proc = completion_found
+      @completion_not_found_proc = completion_not_found
       @done_proc = done
 
       @completion_matches = HistoryBuffer.new(0) do |h|
@@ -35,15 +36,16 @@ module RawLine
           @completion_matches.back
           match = @completion_matches.get
 
-          @completion_updated_proc.call(match)
+          @completion_found_proc.call(match)
         else
+          @completion_not_found_proc.call
           @done_proc.call
         end
         @first_time = false
       else
         @completion_matches.back
         match = @completion_matches.get
-        @completion_updated_proc.call(match)
+        @completion_found_proc.call(match)
       end
     end
 

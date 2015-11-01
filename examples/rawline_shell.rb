@@ -151,6 +151,19 @@ editor.completion_proc = lambda do |word|
   end
 end
 
+editor.on_word_complete do |event|
+  sub_word = event[:payload][:sub_word]
+  word = event[:payload][:word]
+  completion = event[:payload][:completion]
+  editor.content_box.content = "Completing #{sub_word} portion of #{word} to #{completion}"
+end
+
+editor.on_word_complete_no_match do |event|
+  sub_word = event[:payload][:sub_word]
+  word = event[:payload][:word]
+  editor.content_box.content = "Failed to find a match to complete #{sub_word} portion of #{word}"
+end
+
 editor.on_read_line do |event|
   line = event[:payload][:line]
   puts "You typed: [#{line}]"

@@ -49,7 +49,7 @@ module RawLine
     attr_accessor :dom
 
     # TODO: dom traversal for lookup rather than assignment
-    attr_accessor :prompt_box, :input_box
+    attr_accessor :prompt_box, :input_box, :content_box
 
     def puts(*args)
       # @output.puts *args
@@ -395,27 +395,54 @@ module RawLine
         char: @char,
         line: @line,
         completion: @completion_proc,
-        completion_updated: -> (text) {
-          completion_updated(text)
+        completion_found: -> (text) {
+          completion_found(text)
         },
-        done: -> (leftover_bytes){
+        completion_not_found: -> {
+          completion_not_found
+        },
+        done: -> (*leftover_bytes){
+          leftover_bytes = leftover_bytes.flatten
           @keyboard_input_processors.pop
-          if leftover_bytes
+          if leftover_bytes.any?
             @keyboard_input_processors.last.read_bytes(leftover_bytes)
           end
         }
       )
-      completer.read_bytes(@char)
       @keyboard_input_processors.push(completer)
+      completer.read_bytes(@char)
     end
 
-    def completion_updated(text)
+    def completion_found(text)
+      if @on_word_complete
+        word = @line.word[:text]
+        sub_word = @line.text[@line.word[:start]..@line.position-1] || ""
+        completion = text
+        @on_word_complete.call(name: "word-completion", payload: { sub_word: sub_word, word: word, completion: text})
+      end
+
       if @line.word[:text].length > 0
         # If not in a word, print the match, otherwise continue existing word
         move_to_position(@line.word[:end]+@completion_append_string.to_s.length+1)
       end
       (@line.position-@line.word[:start]).times { delete_left_character(true) }
       write text+@completion_append_string.to_s
+    end
+
+    def completion_not_found
+      if @on_word_complete_no_match
+        word = @line.word[:text]
+        sub_word = @line.text[@line.word[:start]..@line.position-1] || ""        
+        @on_word_complete_no_match.call(name: "word-completion-no-match", payload: { sub_word: sub_word, word: word })
+      end
+    end
+
+    def on_word_complete(&blk)
+      @on_word_complete = blk
+    end
+
+    def on_word_complete_no_match(&blk)
+      @on_word_complete_no_match = blk
     end
 
     #
@@ -767,7 +794,8 @@ module RawLine
     def build_dom_tree
       @prompt_box = TerminalLayout::Box.new(content: "default-prompt>", style: {display: :inline})
       @input_box = TerminalLayout::InputBox.new(content: "", style: {display: :inline})
-      TerminalLayout::Box.new(children:[@prompt_box, @input_box])
+      @content_box = TerminalLayout::Box.new(content: "", style: {display: :block})
+      TerminalLayout::Box.new(children:[@prompt_box, @input_box, @content_box])
     end
 
     def build_renderer
