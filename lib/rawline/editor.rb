@@ -42,7 +42,7 @@ module RawLine
 
     attr_accessor :char, :history_size, :line_history_size, :highlight_history_matching_text
     attr_accessor :terminal, :keys, :mode
-    attr_accessor :completion_proc, :line, :history, :completion_append_string
+    attr_accessor :completion_class, :completion_proc, :line, :history, :completion_append_string
     attr_accessor :match_hidden_files
     attr_accessor :word_break_characters
     attr_reader :output
@@ -78,7 +78,7 @@ module RawLine
     # * <tt>@history_size</tt> - the size of the editor history buffer (30).
     # * <tt>@line_history_size</tt> - the size of the editor line history buffer (50).
     # * <tt>@keys</tt> - the keys (arrays of character codes) bound to specific actions.
-    # * <tt>@word_break_characters</tt> - a string listing all characters which can be used as word separators (" \t\n\"\\'`@$><=;|&{(/").
+    # * <tt>@word_break_characters</tt> - a regex used for word separation, default inclues: " \t\n\"\\'`@$><=;|&{("
     # * <tt>@mode</tt> - The editor's character insertion mode (:insert).
     # * <tt>@completion_proc</tt> - a Proc object used to perform word completion.
     # * <tt>@completion_append_string</tt> - a string to append to completed words ('').
@@ -100,8 +100,9 @@ module RawLine
       @history_size = 30
       @line_history_size = 50
       @keys = {}
-      @word_break_characters = " \t\n\"\\'`@$><=;|&{(/"
+      @word_break_characters = " \t\n\"'@\$><=;|&{("
       @mode = :insert
+      @completion_class = Completer
       @completion_proc = filename_completion_proc
       @completion_append_string = ''
       @match_hidden_files = false
@@ -233,14 +234,6 @@ module RawLine
     def subscribe(*args, &blk)
       @event_registry.subscribe(*args, &blk)
     end
-
-    # Readline compatibility aliases
-    alias completion_append_character completion_append_string
-    alias completion_append_character= completion_append_string=
-    alias basic_word_break_characters word_break_characters
-    alias basic_word_break_characters= word_break_characters=
-    alias completer_word_break_characters word_break_characters
-    alias completer_word_break_characters= word_break_characters=
 
     #
     # Parse a key or key sequence into the corresponding codes.
@@ -401,7 +394,7 @@ module RawLine
     # pressed again.
     #
     def complete
-      completer = Completer.new(
+      completer = @completion_class.new(
         char: @char,
         line: @line,
         completion: @completion_proc,
@@ -418,7 +411,8 @@ module RawLine
           if leftover_bytes.any?
             @keyboard_input_processors.last.read_bytes(leftover_bytes)
           end
-        }
+        },
+        keys: terminal.keys
       )
       @keyboard_input_processors.push(completer)
       completer.read_bytes(@char)
@@ -436,7 +430,7 @@ module RawLine
         move_to_position(@line.word[:end]+@completion_append_string.to_s.length+1)
       end
       (@line.position-@line.word[:start]).times { delete_left_character(true) }
-      write completion+@completion_append_string.to_s
+      write completion.to_s + @completion_append_string.to_s
     end
 
     def completion_not_found
@@ -470,7 +464,7 @@ module RawLine
     # Hidden files and directories are matched only if <tt>@match_hidden_files</tt> is true.
     #
     def filename_completion_proc
-      lambda do |word|
+      lambda do |word, _|
         dirs = @line.text.split('/')
           path = @line.text.match(/^\/|[a-zA-Z]:\//) ? "/" : Dir.pwd+"/"
         if dirs.length == 0 then # starting directory
@@ -851,7 +845,7 @@ module RawLine
         value = (ch == ?\s.ord) ? ' ' : Regexp.escape(ch.chr).to_s
         chars << value
       end
-      @word_separator = /#{chars.join('|')}/
+      @word_separator = /(?<!\\)[#{chars.join}]/
     end
 
     def bind_hash(key, block)

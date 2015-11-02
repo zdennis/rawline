@@ -1,13 +1,14 @@
 module RawLine
 
   class Completer
-    def initialize(char:, line:, completion:, completion_found:, completion_not_found:, done:)
+    def initialize(char:, line:, completion:, completion_found:, completion_not_found:, done:, keys:)
       @completion_char = char
       @line = line
       @completion_proc = completion
       @completion_found_proc = completion_found
       @completion_not_found_proc = completion_not_found
       @done_proc = done
+      @keys = keys
 
       @completion_matches = HistoryBuffer.new(0) do |h|
         h.duplicates = false
@@ -22,10 +23,18 @@ module RawLine
     def read_bytes(bytes)
       return unless bytes.any?
 
-      if bytes.map(&:ord) != @completion_char
+      if bytes.map(&:ord) == @keys[:left_arrow]
+        @completion_matches.forward
+        match = @completion_matches.get
+        @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
+      elsif bytes.map(&:ord) == @keys[:right_arrow]
+        @completion_matches.back
+        match = @completion_matches.get
+        @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
+      elsif bytes.map(&:ord) != @completion_char
         @done_proc.call(bytes)
       elsif @first_time
-        matches = @completion_proc.call(sub_word) unless !@completion_proc || @completion_proc == []
+        matches = @completion_proc.call(sub_word, @line.text) unless !@completion_proc || @completion_proc == []
         matches = matches.to_a.compact.sort.reverse
 
         if matches.any?
