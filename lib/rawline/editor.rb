@@ -13,6 +13,7 @@ require 'forwardable'
 require 'terminal_layout'
 require 'ansi_string'
 require 'term/ansicolor'
+require 'fcntl'
 
 module RawLine
 
@@ -172,10 +173,14 @@ module RawLine
     def check_for_keyboard_input
       bytes = []
       begin
+        file_descriptor_flags = @input.fcntl(Fcntl::F_GETFL, 0)
         loop do
           bytes << @input.read_nonblock(1)
         end
       rescue IO::WaitReadable
+        # reset flags so O_NONBLOCK is turned off on the file descriptor
+        # if it was turned on during the read_nonblock above
+        @input.fcntl(Fcntl::F_SETFL, file_descriptor_flags)
         @keyboard_input_processors.last.read_bytes(bytes)
 
         IO.select([@input], [], [], 0.01)
