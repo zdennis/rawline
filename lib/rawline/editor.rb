@@ -175,7 +175,8 @@ module RawLine
       begin
         file_descriptor_flags = @input.fcntl(Fcntl::F_GETFL, 0)
         loop do
-          bytes << @input.read_nonblock(1)
+          string = @input.read_nonblock(4096)
+          bytes.concat string.bytes
         end
       rescue IO::WaitReadable
         # reset flags so O_NONBLOCK is turned off on the file descriptor
@@ -183,7 +184,7 @@ module RawLine
         @input.fcntl(Fcntl::F_SETFL, file_descriptor_flags)
         @keyboard_input_processors.last.read_bytes(bytes)
 
-        IO.select([@input], [], [], 0.01)
+        retry if IO.select([@input], [], [], 0.01)
         @event_loop.add_event name: 'check_for_keyboard_input', source: self
       end
     end
