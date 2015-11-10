@@ -53,6 +53,7 @@ require "#{dir}/rawline/prompt"
 require "#{dir}/rawline/completer"
 require "#{dir}/rawline/event_loop"
 require "#{dir}/rawline/event_registry"
+require "#{dir}/rawline/keycode_parser"
 require "#{dir}/rawline/editor"
 
 module RawLine

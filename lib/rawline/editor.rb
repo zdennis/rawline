@@ -52,25 +52,6 @@ module RawLine
     # TODO: dom traversal for lookup rather than assignment
     attr_accessor :prompt_box, :input_box, :content_box
 
-    def puts(*args)
-      # @output.puts *args
-    end
-
-    def print(*args)
-      # @output.print *args
-    end
-
-    def preserve_cursor(&blk)
-      # @output.synchronize do
-        begin
-          # @output.print @terminal.term_info.control_string("sc")
-          blk.call
-        ensure
-          # @output.print @terminal.term_info.control_string("rc")
-        end
-      # end
-    end
-
     #
     # Create an instance of RawLine::Editor which can be used
     # to read from input and perform line-editing operations.
@@ -193,11 +174,10 @@ module RawLine
       return unless bytes.any?
 
       old_position = @line.position
+      key_codes = parse_key_codes(bytes)
 
-      bytes.each do |byte|
-        c = byte.ord
-        @char = parse_key_code(c) || c
-
+      key_codes.each do |key_code|
+        @char = key_code
         process_character
 
         new_position = @line.position
@@ -209,7 +189,7 @@ module RawLine
         @ignore_position_change = false
         if @char == @terminal.keys[:enter] || !@char
           @allow_prompt_updates = false
-          move_to_end_of_line
+          move_to_beginning_of_input
           @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.dup }
         end
       end
@@ -244,21 +224,8 @@ module RawLine
     #
     # Parse a key or key sequence into the corresponding codes.
     #
-    def parse_key_code(code)
-      if @terminal.escape_codes.include? code then
-        sequence = [code]
-        seqs = []
-        loop do
-          # TODO: this own't work, i'm not sure why this woudl ever be hit anyways
-          c = get_character(@input).ord rescue nil
-          sequence << c
-          seqs = @terminal.escape_sequences.select { |e| e[0..sequence.length-1] == sequence }
-          break if seqs.empty?
-          return sequence if [sequence] == seqs
-        end
-      else
-        return (@terminal.keys.has_value? [code]) ? [code] : nil
-      end
+    def parse_key_codes(bytes)
+      KeycodeParser.new(@terminal.keys).parse_bytes(bytes)
     end
 
     #
@@ -279,6 +246,7 @@ module RawLine
       clear_line
       # @output.print string
       @line.text = string
+      @input_box.position = @line.position
       add_to_line_history
       add_to_history
       @char = nil
@@ -377,6 +345,7 @@ module RawLine
         chars = select_characters_from_cursor if @mode == :insert
         @line.text[@line.position] = (@mode == :insert) ? "#{char.chr}#{@line.text[@line.position].chr}" : "#{char.chr}"
         @line.right
+        @input_box.position = @line.position
         # if @mode == :insert then
         #   chars.length.times { @line.left } # move cursor back
         # end
@@ -385,6 +354,7 @@ module RawLine
         @line << char
       end
       @input_box.content = @line.text
+      @input_box.position = @line.position
       add_to_line_history unless no_line_history
     end
 
@@ -500,8 +470,9 @@ module RawLine
     #
     def move_left
       unless @line.bol? then
-        # @output.putc ?\b.ord
         @line.left
+        @input_box.position = @line.position
+        $z.puts "LINE: #{@line.inspect}"
         return true
       end
       false
@@ -516,6 +487,8 @@ module RawLine
     def move_right
       unless @line.position > @line.eol then
         @line.right
+        @input_box.position = @line.position
+        $z.puts "LINE: #{@line.inspect}"
         # @output.putc @line.text[@line.position-1]
         return true
       end
@@ -588,6 +561,7 @@ module RawLine
         #remove character from line
         @line[@line.position] = ''
         @input_box.content = @line.text
+        @input_box.position = @line.position
         add_to_line_history unless no_line_history
       end
     end
@@ -605,6 +579,7 @@ module RawLine
       add_to_line_history
       @line.text = ""
       @line.position = 0
+      @input_box.position = @line.position
       @history.clear_position
     end
 
@@ -701,6 +676,7 @@ module RawLine
       @line.text[@line.position..-1].tap do
         @line[line.position..-1] = ""
         @input_box.content = line.text
+        @input_box.position = @line.position
       end
     end
 
@@ -708,6 +684,7 @@ module RawLine
       @line.text[line.position] = text
       @line.position = line.position + text.length
       @input_box.content = line.text
+      @input_box.position = @line.position
     end
 
     #
@@ -750,6 +727,7 @@ module RawLine
       @line.position = new_line.length
       move_to_position(pos)
       @line.text = new_line
+      @input_box.position = @line.position
     end
 
     def highlight_text_up_to(text, position)
@@ -764,10 +742,12 @@ module RawLine
 
     def move_to_beginning_of_input
       @line.position = @line.bol
+      @input_box.position = @line.position
     end
 
     def move_to_end_of_input
       @line.position = @line.length
+      @input_box.position = @line.position
     end
 
     #
@@ -786,6 +766,7 @@ module RawLine
       # @output.print @terminal.term_info.control_string("hpa", column)
       # @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
       @line.position = pos
+      @input_box.position = @line.position
     end
 
     def move_to_end_of_line
@@ -793,6 +774,7 @@ module RawLine
       # rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
       # @terminal.move_down_n_rows rows_to_move_down
       @line.position = @line.length
+      @input_box.position = @line.position
 
       column = (@line.prompt.length + @line.position) % terminal_width
       # @output.print @terminal.term_info.control_string("hpa", column)
@@ -829,6 +811,10 @@ module RawLine
 
       @dom.on(:child_changed) do |*args|
         @event_loop.add_event name: "render", source: @dom#, target: event[:target]
+      end
+
+      @dom.on :cursor_position_changed do |*args|
+        @renderer.render_cursor(@input_box)
       end
 
       @event_registry.subscribe :render, -> (_) { render(reset: false) }
@@ -964,39 +950,6 @@ module RawLine
         def escape(string)
           # @output.print string
         end
-      end
-
-      undef move_left
-      def move_left
-        unless @line.bol? then
-          move_up_a_line = ((@line.position + @line.prompt.length) % terminal_width) == 0
-
-          @line.left
-
-          if move_up_a_line
-            escape "\e[A\e[#{terminal_width}C"
-          else
-            escape "\e[D"
-          end
-          return true
-        end
-        false
-      end
-
-      undef move_right
-      def move_right
-        unless @line.position > @line.eol then
-          @line.right
-          move_down_a_line = ((@line.position + @line.prompt.length) % terminal_width) == 0
-
-          if move_down_a_line
-            escape "\e[B\e[#{terminal_width}D"
-          else
-            escape "\e[C"
-          end
-          return true
-        end
-        false
       end
 
       def terminal_width
