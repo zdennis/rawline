@@ -108,11 +108,11 @@ module RawLine
     end
 
     def move_left_n_characters(n)
-      term_info.control "cub1"
+      n.times { term_info.control "cub1" }
     end
 
     def move_right_n_characters(n)
-      term_info.control "cuf1"
+      n.times { term_info.control "cuf1" }
     end
 
     def move_to_column_and_row(column, row)
