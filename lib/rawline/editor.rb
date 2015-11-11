@@ -173,10 +173,8 @@ module RawLine
 
     def read_bytes(bytes)
       return unless bytes.any?
-
       old_position = @line.position
       key_codes = parse_key_codes(bytes)
-
       key_codes.each do |key_code|
         @char = key_code
         process_character
@@ -694,41 +692,20 @@ module RawLine
     # <tt>position</tt>.
     #
     def overwrite_line(new_line, position=nil, options={})
-      pos = position || new_line.length
-
-      clear_screen_down
-
-      number_of_lines = (@line.position + @line.prompt.length) / terminal_width
-
-      # determine the number of lines we need to delete before we can cleanly
-      # overwrite
-      escape "\e[1K"
-      number_of_lines.times {
-        escape "\e[A\e[#{terminal_width}C\e[1K"
-      }
-
       text = @line.text
-      # @output.putc ?\r.ord
-      # @output.print @line.prompt
+      @highlighting = false
 
       if options[:highlight_up_to]
         @highlighting = true
-        raw_print highlight_text_up_to(new_line, options[:highlight_up_to])
-      else
-        @highlighting = false
-        raw_print new_line
+        new_line = highlight_text_up_to(new_line, options[:highlight_up_to])
       end
 
-      n = text.length-new_line.length+1
-      if n > 0
-        # n.times { @output.putc ?\s.ord }
-        # n.times { @output.putc ?\b.ord }
-      end
       @ignore_position_change = true
       @line.position = new_line.length
-      move_to_position(pos)
       @line.text = new_line
+      @input_box.content = @line.text
       @input_box.position = @line.position
+      @event_loop.add_event name: "render", source: @input_box
     end
 
     def highlight_text_up_to(text, position)
