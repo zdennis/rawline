@@ -162,10 +162,11 @@ module RawLine
       rescue IO::WaitReadable
         # reset flags so O_NONBLOCK is turned off on the file descriptor
         # if it was turned on during the read_nonblock above
+        retry if IO.select([@input], [], [], 0.01)
+
         @input.fcntl(Fcntl::F_SETFL, file_descriptor_flags)
         @keyboard_input_processors.last.read_bytes(bytes)
 
-        retry if IO.select([@input], [], [], 0.01)
         @event_loop.add_event name: 'check_for_keyboard_input', source: self
       end
     end
