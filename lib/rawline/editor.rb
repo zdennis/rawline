@@ -471,7 +471,6 @@ module RawLine
       unless @line.bol? then
         @line.left
         @input_box.position = @line.position
-        $z.puts "LINE: #{@line.inspect}"
         return true
       end
       false
@@ -487,8 +486,6 @@ module RawLine
       unless @line.position > @line.eol then
         @line.right
         @input_box.position = @line.position
-        $z.puts "LINE: #{@line.inspect}"
-        # @output.putc @line.text[@line.position-1]
         return true
       end
       false
