@@ -47,23 +47,3 @@ module RawLine
     end
   end
 end
-
-__END__
-      i = 0
-      loop do
-        code = bytes[i]
-        if @terminal.escape_codes.include? code then
-          sequence = [code]
-          seqs = []
-          loop do
-            j = i
-            c = bytes[j+=1]
-            sequence << c
-            seqs = @terminal.escape_sequences.select { |e| e[0..sequence.length-1] == sequence }
-            break if seqs.empty?
-            return sequence if [sequence] == seqs
-          end
-        else
-          return (@terminal.keys.has_value? [code]) ? [code] : nil
-        end
-      end
