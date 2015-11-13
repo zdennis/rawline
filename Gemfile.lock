@@ -1,9 +1,9 @@
 PATH
   remote: .
   specs:
-    rawline (0.3.2)
-      highline (>= 1.7.2)
-      terminal-layout (>= 0.1.0)
+    yap-rawline (0.1.0)
+      highline (~> 1.7.2)
+      terminal-layout (~> 0.1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -23,14 +23,19 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.3.0)
     rspec-support (3.3.0)
+    ruby-terminfo (0.1.1)
+    ruby-termios (0.9.6)
     terminal-layout (0.1.0)
+      highline
+      ruby-terminfo (~> 0.1.1)
+      ruby-termios (~> 0.9.6)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  rawline!
   rspec (~> 3.0)
+  yap-rawline!
 
 BUNDLED WITH
    1.10.6
