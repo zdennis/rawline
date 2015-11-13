@@ -189,7 +189,7 @@ module RawLine
         if @char == @terminal.keys[:enter] || !@char
           @allow_prompt_updates = false
           move_to_beginning_of_input
-          @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.dup }
+          @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup }
         end
       end
     end
@@ -342,7 +342,7 @@ module RawLine
     def print_character(char=@char, no_line_history = false)
       if @line.position < @line.length then
         chars = select_characters_from_cursor if @mode == :insert
-        @line.text[@line.position] = (@mode == :insert) ? "#{char.chr}#{@line.text[@line.position].chr}" : "#{char.chr}"
+        @line.text[@line.position] = (@mode == :insert) ? "#{char.chr}#{@line.text[@line.position]}" : "#{char.chr}"
         @line.right
         @input_box.position = @line.position
         # if @mode == :insert then
@@ -709,13 +709,7 @@ module RawLine
     end
 
     def highlight_text_up_to(text, position)
-      text.chars.map.with_index{ |ch, i|
-        if i < position
-          "\e[1m#{ch}\e[0m"
-        else
-          ch
-        end
-      }.join
+      ANSIString.new("\e[1m#{text[0...position]}\e[0m#{text[position..-1]}")
     end
 
     def move_to_beginning_of_input
