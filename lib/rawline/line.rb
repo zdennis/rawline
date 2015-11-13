@@ -33,7 +33,7 @@ module RawLine
     # * <tt>@prompt</tt> - a prompt to prepend to the line text.
     #
     def initialize(history_size)
-      @text = ""
+      @text = ANSIString.new("")
       @history_size = history_size
       @position = 0
       @prompt = ""
