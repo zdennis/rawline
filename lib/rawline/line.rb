@@ -52,6 +52,10 @@ module RawLine
       terminal_size[0]-@offset
     end
 
+    def text=(val)
+      @text = ANSIString.new(val)
+    end
+
     #
     # Return information about the current word, as a Hash composed by the following
     # elements:
