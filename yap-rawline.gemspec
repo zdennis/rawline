@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name = "yap-rawline"
-  s.version = "0.1.0"
+  s.version = "0.1.1"
   s.summary = %q{A library for defining custom key bindings and perform line editing operations}
   s.description = %q{RawLine can be used to define custom key bindings, perform common line editing operations, manage command history and define custom command completion rules. }
   s.email = %q{h3rald@h3rald.com}
