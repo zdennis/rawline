@@ -25,7 +25,7 @@ GEM
     rspec-support (3.3.0)
     ruby-terminfo (0.1.1)
     ruby-termios (0.9.6)
-    terminal-layout (0.1.0)
+    terminal-layout (0.1.1)
       highline
       ruby-terminfo (~> 0.1.1)
       ruby-termios (~> 0.9.6)
