@@ -233,7 +233,11 @@ module RawLine
     # <tt>@mode == :insert</tt>, deleted otherwise.
     #
     def write(string)
-      string.each_byte { |c| print_character c, true }
+      @line.text += string
+      (string.length + 1).times { @line.right }
+      @input_box.position = @line.position
+      @input_box.content = @line.text
+
       add_to_line_history
     end
 
@@ -400,11 +404,8 @@ module RawLine
         @on_word_complete.call(name: "word-completion", payload: { sub_word: sub_word, word: word, completion: completion, possible_completions: possible_completions })
       end
 
-      if @line.word[:text].length > 0
-        # If not in a word, print the match, otherwise continue existing word
-        move_to_position(@line.word[:end]+@completion_append_string.to_s.length+1)
-      end
-      (@line.position-@line.word[:start]).times { delete_left_character(true) }
+      move_to_position @line.word[:end]
+      delete_n_characters(@line.word[:end] - @line.word[:start], true)
       write completion.to_s + @completion_append_string.to_s
     end
 
@@ -540,6 +541,21 @@ module RawLine
       if move_left then
         delete_character(no_line_history)
       end
+    end
+
+    def delete_n_characters(number_of_characters_to_delete, no_line_history=false)
+      if @line.position > @line.eol
+        @line.position = @line.eol
+      end
+
+      number_of_characters_to_delete.times do |n|
+        @line[@line.position] = ''
+        @line.left
+      end
+
+      @input_box.position = @line.position
+      @input_box.content = @line.text
+      add_to_line_history unless no_line_history
     end
 
     #
