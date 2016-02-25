@@ -688,7 +688,7 @@ module RawLine
 
     def kill_forward
       @line.text[@line.position..-1].tap do
-        @line[line.position..-1] = ""
+        @line.text = ANSIString.new("")
         @input_box.content = line.text
         @input_box.position = @line.position
         @history.clear_position
