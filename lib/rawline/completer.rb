@@ -23,6 +23,10 @@ module RawLine
     def read_bytes(bytes)
       return unless bytes.any?
 
+      # this is to prevent a series of bytes from coming in at one time
+      # E.g. holding down the tab key or arrow keys
+      bytes = bytes.uniq
+
       if bytes.map(&:ord) == @keys[:left_arrow]
         @completion_matches.forward
         match = @completion_matches.get
