@@ -556,6 +556,7 @@ module RawLine
       @input_box.position = @line.position
       @input_box.content = @line.text
       add_to_line_history unless no_line_history
+      @history.clear_position
     end
 
     #
@@ -575,6 +576,7 @@ module RawLine
         @input_box.content = @line.text
         @input_box.position = @line.position
         add_to_line_history unless no_line_history
+        @history.clear_position
       end
     end
 
@@ -689,6 +691,7 @@ module RawLine
         @line[line.position..-1] = ""
         @input_box.content = line.text
         @input_box.position = @line.position
+        @history.clear_position
       end
     end
 
@@ -697,6 +700,7 @@ module RawLine
       @line.position = line.position + text.length
       @input_box.content = line.text
       @input_box.position = @line.position
+      @history.clear_position
     end
 
     #
