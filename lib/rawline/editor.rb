@@ -369,6 +369,7 @@ module RawLine
     # pressed again.
     #
     def complete
+      @input_box.cursor_off
       completer = @completion_class.new(
         char: @char,
         line: @line,
@@ -386,6 +387,7 @@ module RawLine
           if leftover_bytes.any?
             @keyboard_input_processors.last.read_bytes(leftover_bytes)
           end
+          @input_box.cursor_on
         },
         keys: terminal.keys
       )
