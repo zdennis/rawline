@@ -68,7 +68,7 @@ module RawLine
     #
     def initialize(input=STDIN, output=STDOUT)
       @input = input
-      # @output = output
+      @output = output
 
       case RUBY_PLATFORM
       when /mswin/i then
@@ -228,31 +228,27 @@ module RawLine
     end
 
     #
+    # Write to <tt>@output</tt> and then immediately re-render.
+    #
+    def puts(*args)
+      @output.cooked do
+        @output.puts(*args)
+      end
+      render
+    end
+
+    #
     # Write a string to <tt># @output</tt> starting from the cursor position.
     # Characters at the right of the cursor are shifted to the right if
     # <tt>@mode == :insert</tt>, deleted otherwise.
     #
-    def write(string)
+    def append_to_input(string)
       @line.text += string
       (string.length + 1).times { @line.right }
       @input_box.position = @line.position
       @input_box.content = @line.text
 
       add_to_line_history
-    end
-
-    #
-    #  Write a new line to <tt># @output</tt>, overwriting any existing text
-    #  and printing an end of line character.
-    #
-    def write_line(string)
-      clear_line
-      # @output.print string
-      @line.text = string
-      @input_box.position = @line.position
-      add_to_line_history
-      add_to_history
-      @char = nil
     end
 
     #
@@ -406,7 +402,7 @@ module RawLine
 
       move_to_position @line.word[:end]
       delete_n_characters(@line.word[:end] - @line.word[:start], true)
-      write completion.to_s + @completion_append_string.to_s
+      append_to_input completion.to_s + @completion_append_string.to_s
     end
 
     def completion_not_found
