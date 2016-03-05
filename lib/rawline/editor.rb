@@ -189,13 +189,29 @@ module RawLine
         if @char == @terminal.keys[:enter] || !@char
           @allow_prompt_updates = false
           move_to_beginning_of_input
+
+          old_tty_attrs = Termios.tcgetattr(@input)
+          new_tty_attrs = old_tty_attrs.dup
+
+          new_tty_attrs.cflag |= Termios::BRKINT | Termios::ISTRIP | Termios::ICRNL | Termios::IXON
+          new_tty_attrs.oflag |= Termios::OPOST
+          new_tty_attrs.lflag |= Termios::ECHO | Termios::ECHOE | Termios::ECHOK | Termios::ECHONL | Termios::ICANON | Termios::ISIG | Termios::IEXTEN
+
+          Termios::tcsetattr(@input, Termios::TCSANOW, new_tty_attrs)
+          @output.puts
+
           @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup }
+          @event_loop.add_event name: "reset_tty_attrs", source: self, payload: { fd: @input, tty_attrs: old_tty_attrs }
+          @event_loop.add_event name: "render", source: self, payload: { reset: true }
         end
       end
     end
 
     def on_read_line(&blk)
       @event_registry.subscribe :line_read, &blk
+      @event_registry.subscribe :reset_tty_attrs do |event|
+        Termios::tcsetattr(event[:payload][:fd], Termios::TCSANOW, event[:payload][:tty_attrs])
+      end
     end
 
     def start
@@ -778,6 +794,10 @@ module RawLine
       # @terminal.move_down_n_rows(n)
     end
 
+    def redraw_prompt
+      render(reset: true)
+    end
+
     private
 
     def build_dom_tree
@@ -788,7 +808,7 @@ module RawLine
     end
 
     def build_renderer
-      @renderer = TerminalLayout::TerminalRenderer.new(output: $stdout)
+      @renderer = TerminalLayout::TerminalRenderer.new(output: @output)
       @render_tree = TerminalLayout::RenderTree.new(
         @dom,
         parent: nil,
