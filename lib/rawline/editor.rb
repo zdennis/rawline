@@ -558,10 +558,6 @@ module RawLine
     end
 
     def delete_n_characters(number_of_characters_to_delete, no_line_history=false)
-      if @line.position > @line.eol
-        @line.position = @line.eol
-      end
-
       number_of_characters_to_delete.times do |n|
         @line[@line.position] = ''
         @line.left
