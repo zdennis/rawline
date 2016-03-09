@@ -259,8 +259,8 @@ module RawLine
     # <tt>@mode == :insert</tt>, deleted otherwise.
     #
     def append_to_input(string)
-      @line.text += string
-      (string.length + 1).times { @line.right }
+      @line.text[@line.position] = string
+      string.length.times { @line.right }
       @input_box.position = @line.position
       @input_box.content = @line.text
 
