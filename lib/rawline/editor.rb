@@ -607,19 +607,6 @@ module RawLine
       @history.clear_position
     end
 
-    def clear_screen
-      # @output.print @terminal.term_info.control_string("clear")
-      # @terminal.clear_screen
-      # @output.print @line.prompt
-      # @output.print @line.text
-      # (@line.length - @line.position).times {  @output.putc ?\b.ord }
-    end
-
-    def clear_screen_down
-      # @output.print @terminal.term_info.control_string("ed")
-      # @terminal.clear_screen_down
-    end
-
     #
     # Undo the last modification to the current line (<tt>@line.text</tt>).
     # This action is bound to ctrl+z by default.
@@ -778,16 +765,6 @@ module RawLine
       column = (@line.prompt.length + @line.position) % terminal_width
       # @output.print @terminal.term_info.control_string("hpa", column)
       # @terminal.move_to_column((@line.prompt.length + @line.position) % terminal_width)
-    end
-
-    def move_up_n_lines(n)
-      # n.times { @output.print @terminal.term_info.control_string("cuu1") }
-      # @terminal.move_up_n_rows(n)
-    end
-
-    def move_down_n_lines(n)
-      # n.times { @output.print @terminal.term_info.control_string("cud1") }
-      # @terminal.move_down_n_rows(n)
     end
 
     def redraw_prompt
