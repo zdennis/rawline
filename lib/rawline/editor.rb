@@ -114,10 +114,6 @@ module RawLine
 
     attr_reader :dom
 
-    def events
-      @event_loop
-    end
-
     #
     # Return the current RawLine version
     #
@@ -134,22 +130,51 @@ module RawLine
       @prompt_box.content = Prompt.new(text)
     end
 
-    def initialize_line
-      @input_box.content = ""
-      update_word_separator
-      @add_history = true #add_history
-      @line = Line.new(@line_history_size) do |l|
-        l.prompt = @prompt_box.content
-        l.word_separator = @word_separator
-      end
-      add_to_line_history
-      @allow_prompt_updates = true
-    end
-
-    def reset_line
-      initialize_line
+    def redraw_prompt
       render(reset: true)
     end
+
+    ############################################################################
+    #
+    #                                EVENTS
+    #
+    ############################################################################
+
+    # Starts the editor event loop. Must be called before the editor
+    # can be interacted with.
+    def start
+      @input.raw!
+      at_exit { @input.cooked! }
+
+      Signal.trap("SIGWINCH") do
+        @event_loop.add_event name: "terminal-resized", source: self
+      end
+
+      @event_registry.subscribe("terminal-resized") do
+        @render_tree.width = terminal_width
+        @render_tree.height = terminal_height
+        @event_loop.add_event name: "render", source: self
+      end
+
+      @event_loop.add_event name: "render", source: self
+      @event_loop.start
+    end
+
+    # Subscribes to an event with the given block as a callback.
+    def subscribe(*args, &blk)
+      @event_registry.subscribe(*args, &blk)
+    end
+
+    # Returns the Editor's event loop.
+    def events
+      @event_loop
+    end
+
+    ############################################################################
+    #
+    #                               INPUT
+    #
+    ############################################################################
 
     def check_for_keyboard_input
       bytes = []
@@ -205,66 +230,6 @@ module RawLine
           @event_loop.add_event name: "render", source: self, payload: { reset: true }
         end
       end
-    end
-
-    def on_read_line(&blk)
-      @event_registry.subscribe :line_read, &blk
-      @event_registry.subscribe :reset_tty_attrs do |event|
-        Termios::tcsetattr(event[:payload][:fd], Termios::TCSANOW, event[:payload][:tty_attrs])
-      end
-    end
-
-    def start
-      @input.raw!
-      at_exit { @input.cooked! }
-
-      Signal.trap("SIGWINCH") do
-        @event_loop.add_event name: "terminal-resized", source: self
-      end
-
-      @event_registry.subscribe("terminal-resized") do
-        @render_tree.width = terminal_width
-        @render_tree.height = terminal_height
-        @event_loop.add_event name: "render", source: self
-      end
-
-      @event_loop.add_event name: "render", source: self
-      @event_loop.start
-    end
-
-    def subscribe(*args, &blk)
-      @event_registry.subscribe(*args, &blk)
-    end
-
-    #
-    # Parse a key or key sequence into the corresponding codes.
-    #
-    def parse_key_codes(bytes)
-      KeycodeParser.new(@terminal.keys).parse_bytes(bytes)
-    end
-
-    #
-    # Write to <tt>@output</tt> and then immediately re-render.
-    #
-    def puts(*args)
-      @output.cooked do
-        @output.puts(*args)
-      end
-      render
-    end
-
-    #
-    # Write a string to <tt># @output</tt> starting from the cursor position.
-    # Characters at the right of the cursor are shifted to the right if
-    # <tt>@mode == :insert</tt>, deleted otherwise.
-    #
-    def append_to_input(string)
-      @line.text[@line.position] = string
-      string.length.times { @line.right }
-      @input_box.position = @line.position
-      @input_box.content = @line.text
-
-      add_to_line_history
     end
 
     #
@@ -350,6 +315,246 @@ module RawLine
     end
 
     #
+    # Parse a key or key sequence into the corresponding codes.
+    #
+    def parse_key_codes(bytes)
+      KeycodeParser.new(@terminal.keys).parse_bytes(bytes)
+    end
+
+    #
+    # Adds <tt>@line.text</tt> to the editor history. This action is
+    # bound to the enter key by default.
+    #
+    def newline
+      add_to_history
+			@history.clear_position
+    end
+
+    def on_read_line(&blk)
+      @event_registry.subscribe :line_read, &blk
+      @event_registry.subscribe :reset_tty_attrs do |event|
+        Termios::tcsetattr(event[:payload][:fd], Termios::TCSANOW, event[:payload][:tty_attrs])
+      end
+    end
+
+
+    ############################################################################
+    #
+    #                            LINE EDITING
+    #
+    ############################################################################
+
+    #
+    # Write a string to <tt># @output</tt> starting from the cursor position.
+    # Characters at the right of the cursor are shifted to the right if
+    # <tt>@mode == :insert</tt>, deleted otherwise.
+    #
+    def append_to_input(string)
+      @line.text[@line.position] = string
+      string.length.times { @line.right }
+      @input_box.position = @line.position
+      @input_box.content = @line.text
+
+      add_to_line_history
+    end
+
+    #
+    # Clear the current line, i.e.
+    # <tt>@line.text</tt> and <tt>@line.position</tt>.
+    # This action is bound to ctrl+k by default.
+    #
+    def clear_line
+      # @output.putc ?\r
+      # @output.print @line.prompt
+      # @line.length.times {  @output.putc ?\s.ord }
+      # @line.length.times {  @output.putc ?\b.ord }
+      add_to_line_history
+      @line.text = ""
+      @line.position = 0
+      @input_box.position = @line.position
+      @history.clear_position
+    end
+
+    #
+    # Delete the character at the left of the cursor.
+    # If <tt>no_line_hisytory</tt> is set to true, the deletion won't be
+    # recorded in the line history.
+    # This action is bound to the backspace key by default.
+    #
+    def delete_left_character(no_line_history=false)
+      if move_left then
+        delete_character(no_line_history)
+      end
+    end
+
+    def delete_n_characters(number_of_characters_to_delete, no_line_history=false)
+      number_of_characters_to_delete.times do |n|
+        @line[@line.position] = ''
+        @line.left
+      end
+
+      @input_box.position = @line.position
+      @input_box.content = @line.text
+      add_to_line_history unless no_line_history
+      @history.clear_position
+    end
+
+    #
+    # Delete the character under the cursor.
+    # If <tt>no_line_hisytory</tt> is set to true, the deletion won't be
+    # recorded in the line history.
+    # This action is bound to the delete key by default.
+    #
+    def delete_character(no_line_history=false)
+      unless @line.position > @line.eol
+        # save characters to shift
+        chars = (@line.eol?) ? ' ' : select_characters_from_cursor(1)
+        # remove character from console and shift characters
+        # (chars.length+1).times { # @output.putc ?\b.ord }
+        #remove character from line
+        @line[@line.position] = ''
+        @input_box.content = @line.text
+        @input_box.position = @line.position
+        add_to_line_history unless no_line_history
+        @history.clear_position
+      end
+    end
+
+    def highlight_text_up_to(text, position)
+      ANSIString.new("\e[1m#{text[0...position]}\e[0m#{text[position..-1]}")
+    end
+
+    def kill_forward
+      @line.text[@line.position..-1].tap do
+        @line.text = ANSIString.new("")
+        @input_box.content = line.text
+        @input_box.position = @line.position
+        @history.clear_position
+      end
+    end
+
+    def yank_forward(text)
+      @line.text[line.position] = text
+      @line.position = line.position + text.length
+      @input_box.content = line.text
+      @input_box.position = @line.position
+      @history.clear_position
+    end
+
+    #
+    # Move the cursor left (if possible) by printing a
+    # backspace, updating <tt>@line.position</tt> accordingly.
+    # This action is bound to the left arrow key by default.
+    #
+    def move_left
+      unless @line.bol? then
+        @line.left
+        @input_box.position = @line.position
+        return true
+      end
+      false
+    end
+
+    #
+    # Move the cursor right (if possible) by re-printing the
+    # character at the right of the cursor, if any, and updating
+    # <tt>@line.position</tt> accordingly.
+    # This action is bound to the right arrow key by default.
+    #
+    def move_right
+      unless @line.position > @line.eol then
+        @line.right
+        @input_box.position = @line.position
+        return true
+      end
+      false
+    end
+
+    def move_to_beginning_of_input
+      @line.position = @line.bol
+      @input_box.position = @line.position
+    end
+
+    def move_to_end_of_input
+      @line.position = @line.length
+      @input_box.position = @line.position
+    end
+
+    #
+    # Move the cursor to <tt>pos</tt>.
+    #
+    def move_to_position(pos)
+      rows_to_move = current_terminal_row - terminal_row_for_line_position(pos)
+      if rows_to_move > 0
+        # rows_to_move.times { @output.print @terminal.term_info.control_string("cuu1") }
+        # @terminal.move_up_n_rows(rows_to_move)
+      else
+        # rows_to_move.abs.times { @output.print @terminal.term_info.control_string("cud1") }
+        # @terminal.move_down_n_rows(rows_to_move.abs)
+      end
+      column = (@line.prompt.length + pos) % terminal_width
+      # @output.print @terminal.term_info.control_string("hpa", column)
+      # @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
+      @line.position = pos
+      @input_box.position = @line.position
+    end
+
+    def move_to_end_of_line
+      rows_to_move_down = number_of_terminal_rows - current_terminal_row
+      # rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
+      # @terminal.move_down_n_rows rows_to_move_down
+      @line.position = @line.length
+      @input_box.position = @line.position
+
+      column = (@line.prompt.length + @line.position) % terminal_width
+      # @output.print @terminal.term_info.control_string("hpa", column)
+      # @terminal.move_to_column((@line.prompt.length + @line.position) % terminal_width)
+    end
+
+    #
+    # Overwrite the current line (<tt>@line.text</tt>)
+    # with <tt>new_line</tt>, and optionally reset the cursor position to
+    # <tt>position</tt>.
+    #
+    def overwrite_line(new_line, position=nil, options={})
+      text = @line.text
+      @highlighting = false
+
+      if options[:highlight_up_to]
+        @highlighting = true
+        new_line = highlight_text_up_to(new_line, options[:highlight_up_to])
+      end
+
+      @ignore_position_change = true
+      @line.position = new_line.length
+      @line.text = new_line
+      @input_box.content = @line.text
+      @input_box.position = @line.position
+      @event_loop.add_event name: "render", source: @input_box
+    end
+
+    def reset_line
+      initialize_line
+      render(reset: true)
+    end
+
+    #
+    # Toggle the editor <tt>@mode</tt> to :replace or :insert (default).
+    #
+    def toggle_mode
+      case @mode
+      when :insert then @mode = :replace
+      when :replace then @mode = :insert
+      end
+    end
+
+    ############################################################################
+    #
+    #                            OUTPUT
+    #
+    ############################################################################
+
+    #
     # Write a character to <tt># @output</tt> at cursor position,
     # shifting characters as appropriate.
     # If <tt>no_line_history</tt> is set to <tt>true</tt>, the updated
@@ -372,6 +577,23 @@ module RawLine
       @input_box.position = @line.position
       add_to_line_history unless no_line_history
     end
+
+    #
+    # Write to <tt>@output</tt> and then immediately re-render.
+    #
+    def puts(*args)
+      @output.cooked do
+        @output.puts(*args)
+      end
+      render
+    end
+
+
+    ############################################################################
+    #
+    #                             COMPLETION
+    #
+    ############################################################################
 
     #
     # Complete the current word according to what returned by
@@ -467,63 +689,11 @@ module RawLine
       end
     end
 
-
+    ############################################################################
     #
-    # Adds <tt>@line.text</tt> to the editor history. This action is
-    # bound to the enter key by default.
+    #                            HISTORY
     #
-    def newline
-      add_to_history
-			@history.clear_position
-    end
-
-    #
-    # Move the cursor left (if possible) by printing a
-    # backspace, updating <tt>@line.position</tt> accordingly.
-    # This action is bound to the left arrow key by default.
-    #
-    def move_left
-      unless @line.bol? then
-        @line.left
-        @input_box.position = @line.position
-        return true
-      end
-      false
-    end
-
-    #
-    # Move the cursor right (if possible) by re-printing the
-    # character at the right of the cursor, if any, and updating
-    # <tt>@line.position</tt> accordingly.
-    # This action is bound to the right arrow key by default.
-    #
-    def move_right
-      unless @line.position > @line.eol then
-        @line.right
-        @input_box.position = @line.position
-        return true
-      end
-      false
-    end
-
-    #
-    # Print debug information about the current line. Note that after
-    # the message is displayed, the line text and position will be restored.
-    #
-    def debug_line
-      pos = @line.position
-      text = @line.text
-      word = @line.word
-      # @output.puts
-      # @output.puts "Text: [#{text}]"
-      # @output.puts "Length: #{@line.length}"
-      # @output.puts "Position: #{pos}"
-      # @output.puts "Character at Position: [#{text[pos].chr}] (#{text[pos]})" unless pos >= @line.length
-      # @output.puts "Current Word: [#{word[:text]}] (#{word[:start]} -- #{word[:end]})"
-      clear_line
-      raw_print text
-      overwrite_line(text, pos)
-    end
+    ############################################################################
 
     #
     # Print the content of the editor history. Note that after
@@ -543,68 +713,6 @@ module RawLine
     #
     def clear_history
       @history.empty
-    end
-
-    #
-    # Delete the character at the left of the cursor.
-    # If <tt>no_line_hisytory</tt> is set to true, the deletion won't be
-    # recorded in the line history.
-    # This action is bound to the backspace key by default.
-    #
-    def delete_left_character(no_line_history=false)
-      if move_left then
-        delete_character(no_line_history)
-      end
-    end
-
-    def delete_n_characters(number_of_characters_to_delete, no_line_history=false)
-      number_of_characters_to_delete.times do |n|
-        @line[@line.position] = ''
-        @line.left
-      end
-
-      @input_box.position = @line.position
-      @input_box.content = @line.text
-      add_to_line_history unless no_line_history
-      @history.clear_position
-    end
-
-    #
-    # Delete the character under the cursor.
-    # If <tt>no_line_hisytory</tt> is set to true, the deletion won't be
-    # recorded in the line history.
-    # This action is bound to the delete key by default.
-    #
-    def delete_character(no_line_history=false)
-      unless @line.position > @line.eol
-        # save characters to shift
-        chars = (@line.eol?) ? ' ' : select_characters_from_cursor(1)
-        # remove character from console and shift characters
-        # (chars.length+1).times { # @output.putc ?\b.ord }
-        #remove character from line
-        @line[@line.position] = ''
-        @input_box.content = @line.text
-        @input_box.position = @line.position
-        add_to_line_history unless no_line_history
-        @history.clear_position
-      end
-    end
-
-    #
-    # Clear the current line, i.e.
-    # <tt>@line.text</tt> and <tt>@line.position</tt>.
-    # This action is bound to ctrl+k by default.
-    #
-    def clear_line
-      # @output.putc ?\r
-      # @output.print @line.prompt
-      # @line.length.times {  @output.putc ?\s.ord }
-      # @line.length.times {  @output.putc ?\b.ord }
-      add_to_line_history
-      @line.text = ""
-      @line.position = 0
-      @input_box.position = @line.position
-      @history.clear_position
     end
 
     #
@@ -661,114 +769,28 @@ module RawLine
       @history << @line.text.dup if @add_history && @line.text != ""
     end
 
+    ############################################################################
     #
-    # Toggle the editor <tt>@mode</tt> to :replace or :insert (default).
+    #                            DEBUGGING
     #
-    def toggle_mode
-      case @mode
-      when :insert then @mode = :replace
-      when :replace then @mode = :insert
-      end
-    end
-
-    def terminal_row_for_line_position(line_position)
-      ((@line.prompt.length + line_position) / terminal_width.to_f).ceil
-    end
-
-    def current_terminal_row
-      ((@line.position + @line.prompt.length + 1) / terminal_width.to_f).ceil
-    end
-
-    def number_of_terminal_rows
-      ((@line.length + @line.prompt.length) / terminal_width.to_f).ceil
-    end
-
-    def kill_forward
-      @line.text[@line.position..-1].tap do
-        @line.text = ANSIString.new("")
-        @input_box.content = line.text
-        @input_box.position = @line.position
-        @history.clear_position
-      end
-    end
-
-    def yank_forward(text)
-      @line.text[line.position] = text
-      @line.position = line.position + text.length
-      @input_box.content = line.text
-      @input_box.position = @line.position
-      @history.clear_position
-    end
+    ############################################################################
 
     #
-    # Overwrite the current line (<tt>@line.text</tt>)
-    # with <tt>new_line</tt>, and optionally reset the cursor position to
-    # <tt>position</tt>.
+    # Print debug information about the current line. Note that after
+    # the message is displayed, the line text and position will be restored.
     #
-    def overwrite_line(new_line, position=nil, options={})
+    def debug_line
+      pos = @line.position
       text = @line.text
-      @highlighting = false
-
-      if options[:highlight_up_to]
-        @highlighting = true
-        new_line = highlight_text_up_to(new_line, options[:highlight_up_to])
-      end
-
-      @ignore_position_change = true
-      @line.position = new_line.length
-      @line.text = new_line
-      @input_box.content = @line.text
-      @input_box.position = @line.position
-      @event_loop.add_event name: "render", source: @input_box
-    end
-
-    def highlight_text_up_to(text, position)
-      ANSIString.new("\e[1m#{text[0...position]}\e[0m#{text[position..-1]}")
-    end
-
-    def move_to_beginning_of_input
-      @line.position = @line.bol
-      @input_box.position = @line.position
-    end
-
-    def move_to_end_of_input
-      @line.position = @line.length
-      @input_box.position = @line.position
-    end
-
-    #
-    # Move the cursor to <tt>pos</tt>.
-    #
-    def move_to_position(pos)
-      rows_to_move = current_terminal_row - terminal_row_for_line_position(pos)
-      if rows_to_move > 0
-        # rows_to_move.times { @output.print @terminal.term_info.control_string("cuu1") }
-        # @terminal.move_up_n_rows(rows_to_move)
-      else
-        # rows_to_move.abs.times { @output.print @terminal.term_info.control_string("cud1") }
-        # @terminal.move_down_n_rows(rows_to_move.abs)
-      end
-      column = (@line.prompt.length + pos) % terminal_width
-      # @output.print @terminal.term_info.control_string("hpa", column)
-      # @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
-      @line.position = pos
-      @input_box.position = @line.position
-    end
-
-    def move_to_end_of_line
-      rows_to_move_down = number_of_terminal_rows - current_terminal_row
-      # rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
-      # @terminal.move_down_n_rows rows_to_move_down
-      @line.position = @line.length
-      @input_box.position = @line.position
-
-      column = (@line.prompt.length + @line.position) % terminal_width
-      # @output.print @terminal.term_info.control_string("hpa", column)
-      # @terminal.move_to_column((@line.prompt.length + @line.position) % terminal_width)
-    end
-
-    def redraw_prompt
-      render(reset: true)
+      word = @line.word
+      # @output.puts
+      # @output.puts "Text: [#{text}]"
+      # @output.puts "Length: #{@line.length}"
+      # @output.puts "Position: #{pos}"
+      # @output.puts "Character at Position: [#{text[pos].chr}] (#{text[pos]})" unless pos >= @line.length
+      # @output.puts "Current Word: [#{word[:text]}] (#{word[:start]} -- #{word[:end]})"
+      clear_line
+      overwrite_line(text, pos)
     end
 
     private
@@ -809,6 +831,18 @@ module RawLine
       @event_loop.add_event name: "check_for_keyboard_input"
     end
 
+    def initialize_line
+      @input_box.content = ""
+      update_word_separator
+      @add_history = true #add_history
+      @line = Line.new(@line_history_size) do |l|
+        l.prompt = @prompt_box.content
+        l.word_separator = @word_separator
+      end
+      add_to_line_history
+      @allow_prompt_updates = true
+    end
+
     def update_word_separator
       return @word_separator = "" if @word_break_characters.to_s == ""
       chars = []
@@ -841,10 +875,6 @@ module RawLine
 
     def select_characters_from_cursor(offset=0)
       select_characters(:right, @line.length-@line.position, offset)
-    end
-
-    def raw_print(string)
-      # string.each_byte { |c| @output.putc c }
     end
 
     def generic_history_back(history)
@@ -915,6 +945,18 @@ module RawLine
       else
         @matching_text = @line[0...@line.position]
       end
+    end
+
+    def terminal_row_for_line_position(line_position)
+      ((@line.prompt.length + line_position) / terminal_width.to_f).ceil
+    end
+
+    def current_terminal_row
+      ((@line.position + @line.prompt.length + 1) / terminal_width.to_f).ceil
+    end
+
+    def number_of_terminal_rows
+      ((@line.length + @line.prompt.length) / terminal_width.to_f).ceil
     end
   end
 
