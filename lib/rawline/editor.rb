@@ -52,6 +52,28 @@ module RawLine
     # TODO: dom traversal for lookup rather than assignment
     attr_accessor :prompt_box, :input_box, :content_box
 
+    def self.create(&blk)
+      terminal = nil
+
+      case RUBY_PLATFORM
+      when /mswin/i then
+        terminal = WindowsTerminal.new(STDOUT)
+        if RawLine.win32console? then
+          win32_io = Win32::Console::ANSI::IO.new
+        end
+      else
+        terminal = VT220Terminal.new(STDOUT)
+      end
+
+      new(
+        input: STDIN,
+        output: STDOUT,
+        input_reader: NonBlockingInputReader.new(STDIN),
+        terminal: terminal,
+        &blk
+      )
+    end
+
     #
     # Create an instance of RawLine::Editor which can be used
     # to read from input and perform line-editing operations.
@@ -66,19 +88,12 @@ module RawLine
     # * <tt>@completion_append_string</tt> - a string to append to completed words ('').
     # * <tt>@terminal</tt> -  a RawLine::Terminal containing character key codes.
     #
-    def initialize(input=STDIN, output=STDOUT)
+    def initialize(input:, output:, renderer_klass: RawLine::Renderer, input_reader:, terminal:)
       @input = input
       @output = output
+      @input_reader = input_reader || NonBlockingInputReader.new(@input)
+      @terminal = terminal
 
-      case RUBY_PLATFORM
-      when /mswin/i then
-        @terminal = WindowsTerminal.new
-        if RawLine.win32console? then
-          @win32_io = Win32::Console::ANSI::IO.new
-        end
-      else
-        @terminal = VT220Terminal.new
-      end
       @history_size = 30
       @line_history_size = 50
       @keys = {}
@@ -96,6 +111,8 @@ module RawLine
         h.exclude = lambda { |item| item.strip == "" }
       end
       @keyboard_input_processors = [self]
+      # @allow_prompt_updates = true
+      @dom ||= build_dom_tree
       yield self if block_given?
       update_word_separator
       @char = nil
@@ -106,13 +123,17 @@ module RawLine
       end
       @event_loop = Rawline::EventLoop.new(registry: @event_registry)
 
-      @dom ||= build_dom_tree
-      @renderer ||= build_renderer
-
+      @renderer ||= renderer_klass.new(
+        dom: @dom,
+        output: @output,
+        width: terminal_width,
+        height: terminal_height
+      )
+      setup_renderer
       initialize_line
     end
 
-    attr_reader :dom
+    attr_reader :dom, :event_loop
 
     #
     # Return the current RawLine version
@@ -122,12 +143,13 @@ module RawLine
     end
 
     def prompt
-      @line.prompt if @line
+      @prompt
     end
 
     def prompt=(text)
-      return if !@allow_prompt_updates || @line.nil? || @line.prompt == text
-      @prompt_box.content = Prompt.new(text)
+      return if @line && @line.prompt == text
+      @prompt = Prompt.new(text)
+      @prompt_box.content = @prompt
     end
 
     def redraw_prompt
@@ -177,23 +199,11 @@ module RawLine
     ############################################################################
 
     def check_for_keyboard_input
-      bytes = []
-      begin
-        file_descriptor_flags = @input.fcntl(Fcntl::F_GETFL, 0)
-        loop do
-          string = @input.read_nonblock(4096)
-          bytes.concat string.bytes
-        end
-      rescue IO::WaitReadable
-        # reset flags so O_NONBLOCK is turned off on the file descriptor
-        # if it was turned on during the read_nonblock above
-        retry if IO.select([@input], [], [], 0.01)
-
-        @input.fcntl(Fcntl::F_SETFL, file_descriptor_flags)
+      bytes = @input_reader.read_bytes
+      if bytes.any?
         @keyboard_input_processors.last.read_bytes(bytes)
-
-        @event_loop.add_event name: 'check_for_keyboard_input', source: self
       end
+      @event_loop.add_event name: 'check_for_keyboard_input', source: self
     end
 
     def read_bytes(bytes)
@@ -212,7 +222,7 @@ module RawLine
 
         @ignore_position_change = false
         if @char == @terminal.keys[:enter] || !@char
-          @allow_prompt_updates = false
+          # @allow_prompt_updates = false
           move_to_beginning_of_input
 
           old_tty_attrs = Termios.tcgetattr(@input)
@@ -343,20 +353,6 @@ module RawLine
     #                            LINE EDITING
     #
     ############################################################################
-
-    #
-    # Write a string to <tt># @output</tt> starting from the cursor position.
-    # Characters at the right of the cursor are shifted to the right if
-    # <tt>@mode == :insert</tt>, deleted otherwise.
-    #
-    def append_to_input(string)
-      @line.text[@line.position] = string
-      string.length.times { @line.right }
-      @input_box.position = @line.position
-      @input_box.content = @line.text
-
-      add_to_line_history
-    end
 
     #
     # Clear the current line, i.e.
@@ -526,7 +522,7 @@ module RawLine
       end
 
       @ignore_position_change = true
-      @line.position = new_line.length
+      @line.position = position || new_line.length
       @line.text = new_line
       @input_box.content = @line.text
       @input_box.position = @line.position
@@ -582,12 +578,21 @@ module RawLine
     # Write to <tt>@output</tt> and then immediately re-render.
     #
     def puts(*args)
-      @output.cooked do
-        @output.puts(*args)
-      end
+      @terminal.puts(*args)
       render
     end
 
+    #
+    # Write a string starting from the cursor position.
+    #
+    def write(string)
+      @line.text[@line.position] = string
+      string.length.times { @line.right }
+      @input_box.position = @line.position
+      @input_box.content = @line.text
+
+      add_to_line_history
+    end
 
     ############################################################################
     #
@@ -642,7 +647,7 @@ module RawLine
 
       move_to_position @line.word[:end]
       delete_n_characters(@line.word[:end] - @line.word[:start], true)
-      append_to_input completion.to_s + @completion_append_string.to_s
+      write completion.to_s + @completion_append_string.to_s
     end
 
     def completion_not_found
@@ -802,15 +807,7 @@ module RawLine
       TerminalLayout::Box.new(children:[@prompt_box, @input_box, @content_box])
     end
 
-    def build_renderer
-      @renderer = TerminalLayout::TerminalRenderer.new(output: @output)
-      @render_tree = TerminalLayout::RenderTree.new(
-        @dom,
-        parent: nil,
-        style: { width:terminal_width, height:terminal_height },
-        renderer: @renderer
-      )
-
+    def setup_renderer
       @dom.on(:child_changed) do |*args|
         @event_loop.add_event name: "render", source: @dom#, target: event[:target]
       end
@@ -825,9 +822,7 @@ module RawLine
     end
 
     def render(reset: false)
-      @render_tree.layout
-      @renderer.reset if reset
-      @renderer.render(@render_tree)
+      @renderer.render(reset: reset)
       @event_loop.add_event name: "check_for_keyboard_input"
     end
 

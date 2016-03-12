@@ -31,27 +31,31 @@ module RawLine
       end
     end
 
-    def start
-      loop do
-        event = @events.shift
-        if event
-          recur = event[:recur]
-          if recur
-            if current_time_in_ms >= recur[:recur_at]
-              dispatch_event(event)
-              interval_in_ms = recur[:interval_in_ms]
-              add_event event.merge(recur: { interval_in_ms: interval_in_ms, recur_at: recur_at(interval_in_ms) } )
-            else
-              # put it back on the queue
-              add_event event
-              dispatch_event(default_event)
-            end
-          else
+    def tick
+      event = @events.shift
+      if event
+        recur = event[:recur]
+        if recur
+          if current_time_in_ms >= recur[:recur_at]
             dispatch_event(event)
+            interval_in_ms = recur[:interval_in_ms]
+            add_event event.merge(recur: { interval_in_ms: interval_in_ms, recur_at: recur_at(interval_in_ms) } )
+          else
+            # put it back on the queue
+            add_event event
+            dispatch_event(default_event)
           end
         else
-          dispatch_event(default_event)
+          dispatch_event(event)
         end
+      else
+        dispatch_event(default_event)
+      end
+    end
+
+    def start
+      loop do
+        tick
       end
     end
 

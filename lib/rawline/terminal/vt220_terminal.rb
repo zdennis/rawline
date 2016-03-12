@@ -17,8 +17,8 @@ module RawLine
   #
   class VT220Terminal < Terminal
 
-    def initialize
-      super
+    def initialize(*args)
+      super(*args)
       @escape_codes = [?\e.ord]
       @keys.merge!(
         {

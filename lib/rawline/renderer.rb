@@ -1,0 +1,25 @@
+module RawLine
+  class Renderer
+    def initialize(dom:, output:, width:, height:)
+      @dom = dom
+      @output = output
+      @renderer = TerminalLayout::TerminalRenderer.new(output: output)
+      @render_tree = TerminalLayout::RenderTree.new(
+        dom,
+        parent: nil,
+        style: { width: width, height: height },
+        renderer: @renderer
+      )
+    end
+
+    def render(reset: false)
+      @render_tree.layout
+      @renderer.reset if reset
+      @renderer.render(@render_tree)
+    end
+
+    def render_cursor(input_box)
+      @renderer.render_cursor(input_box)
+    end
+  end
+end

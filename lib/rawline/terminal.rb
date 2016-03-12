@@ -32,7 +32,8 @@ module RawLine
     #
     # Create an instance of RawLine::Terminal.
     #
-    def initialize
+    def initialize(output)
+      @output = output
       @keys =
         {
         :tab => [?\t.ord],
@@ -129,6 +130,12 @@ module RawLine
 
     def move_down_n_rows(n)
       n.times { term_info.control "cud1" }
+    end
+
+    def puts(*args)
+      @output.cooked do
+        @output.puts(*args)
+      end
     end
 
     def preserve_cursor(&blk)
