@@ -51,7 +51,7 @@ module RawLine
     # TODO: dom traversal for lookup rather than assignment
     attr_accessor :prompt_box, :input_box, :content_box
 
-    def self.create(&blk)
+    def self.create(dom: nil, &blk)
       terminal = nil
 
       input = STDIN
@@ -67,8 +67,19 @@ module RawLine
         terminal = VT220Terminal.new(input, output)
       end
 
+      dom ||= DomTree.new
+
+      renderer = RawLine::Renderer.new(
+        dom: dom,
+        output: terminal.output,
+        width: terminal.width,
+        height: terminal.height
+      )
+
       new(
+        dom: dom,
         input_reader: NonBlockingInputReader.new(input),
+        renderer: renderer,
         terminal: terminal,
         &blk
       )
@@ -88,8 +99,10 @@ module RawLine
     # * <tt>@completion_append_string</tt> - a string to append to completed words ('').
     # * <tt>@terminal</tt> -  a RawLine::Terminal containing character key codes.
     #
-    def initialize(renderer_klass: RawLine::Renderer, input_reader:, terminal:)
+    def initialize(dom:, input_reader:, renderer:, terminal:)
+      @dom = dom
       @input_reader = input_reader
+      @renderer = renderer
       @terminal = terminal
 
       @history_size = 30
@@ -110,24 +123,11 @@ module RawLine
       end
       @keyboard_input_processors = [self]
       # @allow_prompt_updates = true
-      @dom ||= build_dom_tree
       yield self if block_given?
       update_word_separator
       @char = nil
 
-      @event_registry = Rawline::EventRegistry.new do |registry|
-        registry.subscribe :default, -> (_) { self.check_for_keyboard_input }
-        registry.subscribe :dom_tree_change, -> (_) { self.render }
-      end
-      @event_loop = Rawline::EventLoop.new(registry: @event_registry)
-
-      @renderer ||= renderer_klass.new(
-        dom: @dom,
-        output: terminal.output,
-        width: terminal.width,
-        height: terminal.height
-      )
-      setup_renderer
+      initialize_events
       initialize_line
     end
 
@@ -147,7 +147,7 @@ module RawLine
     def prompt=(text)
       return if @line && @line.prompt == text
       @prompt = Prompt.new(text)
-      @prompt_box.content = @prompt
+      @dom.prompt_box.content = @prompt
     end
 
     def redraw_prompt
@@ -313,7 +313,7 @@ module RawLine
     # This method is called automatically by <tt>process_character</tt>.
     #
     def default_action
-      @input_box.content += @char.chr
+      @dom.input_box.content += @char.chr
       print_character
     end
 
@@ -352,7 +352,7 @@ module RawLine
       add_to_line_history
       @line.text = ""
       @line.position = 0
-      @input_box.position = @line.position
+      @dom.input_box.position = @line.position
       @history.clear_position
     end
 
@@ -374,8 +374,8 @@ module RawLine
         @line.left
       end
 
-      @input_box.position = @line.position
-      @input_box.content = @line.text
+      @dom.input_box.position = @line.position
+      @dom.input_box.content = @line.text
       add_to_line_history unless no_line_history
       @history.clear_position
     end
@@ -392,8 +392,8 @@ module RawLine
         chars = (@line.eol?) ? ' ' : select_characters_from_cursor(1)
         #remove character from line
         @line[@line.position] = ''
-        @input_box.content = @line.text
-        @input_box.position = @line.position
+        @dom.input_box.content = @line.text
+        @dom.input_box.position = @line.position
         add_to_line_history unless no_line_history
         @history.clear_position
       end
@@ -406,8 +406,8 @@ module RawLine
     def kill_forward
       @line.text[@line.position..-1].tap do
         @line.text = ANSIString.new("")
-        @input_box.content = line.text
-        @input_box.position = @line.position
+        @dom.input_box.content = line.text
+        @dom.input_box.position = @line.position
         @history.clear_position
       end
     end
@@ -415,8 +415,8 @@ module RawLine
     def yank_forward(text)
       @line.text[line.position] = text
       @line.position = line.position + text.length
-      @input_box.content = line.text
-      @input_box.position = @line.position
+      @dom.input_box.content = line.text
+      @dom.input_box.position = @line.position
       @history.clear_position
     end
 
@@ -428,7 +428,7 @@ module RawLine
     def move_left
       unless @line.bol? then
         @line.left
-        @input_box.position = @line.position
+        @dom.input_box.position = @line.position
         return true
       end
       false
@@ -443,7 +443,7 @@ module RawLine
     def move_right
       unless @line.position > @line.eol then
         @line.right
-        @input_box.position = @line.position
+        @dom.input_box.position = @line.position
         return true
       end
       false
@@ -451,12 +451,12 @@ module RawLine
 
     def move_to_beginning_of_input
       @line.position = @line.bol
-      @input_box.position = @line.position
+      @dom.input_box.position = @line.position
     end
 
     def move_to_end_of_input
       @line.position = @line.length
-      @input_box.position = @line.position
+      @dom.input_box.position = @line.position
     end
 
     #
@@ -475,7 +475,7 @@ module RawLine
       # @output.print @terminal.term_info.control_string("hpa", column)
       # @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
       @line.position = pos
-      @input_box.position = @line.position
+      @dom.input_box.position = @line.position
     end
 
     def move_to_end_of_line
@@ -483,7 +483,7 @@ module RawLine
       # rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
       # @terminal.move_down_n_rows rows_to_move_down
       @line.position = @line.length
-      @input_box.position = @line.position
+      @dom.input_box.position = @line.position
 
       column = (@line.prompt.length + @line.position) % terminal_width
       # @output.print @terminal.term_info.control_string("hpa", column)
@@ -507,9 +507,9 @@ module RawLine
       @ignore_position_change = true
       @line.position = position || new_line.length
       @line.text = new_line
-      @input_box.content = @line.text
-      @input_box.position = @line.position
-      @event_loop.add_event name: "render", source: @input_box
+      @dom.input_box.content = @line.text
+      @dom.input_box.position = @line.position
+      @event_loop.add_event name: "render", source: @dom.input_box
     end
 
     def reset_line
@@ -544,7 +544,7 @@ module RawLine
         chars = select_characters_from_cursor if @mode == :insert
         @line.text[@line.position] = (@mode == :insert) ? "#{char.chr}#{@line.text[@line.position]}" : "#{char.chr}"
         @line.right
-        @input_box.position = @line.position
+        @dom.input_box.position = @line.position
         # if @mode == :insert then
         #   chars.length.times { @line.left } # move cursor back
         # end
@@ -552,8 +552,8 @@ module RawLine
         @line.right
         @line << char
       end
-      @input_box.content = @line.text
-      @input_box.position = @line.position
+      @dom.input_box.content = @line.text
+      @dom.input_box.position = @line.position
       add_to_line_history unless no_line_history
     end
 
@@ -571,8 +571,8 @@ module RawLine
     def write(string)
       @line.text[@line.position] = string
       string.length.times { @line.right }
-      @input_box.position = @line.position
-      @input_box.content = @line.text
+      @dom.input_box.position = @line.position
+      @dom.input_box.content = @line.text
 
       add_to_line_history
     end
@@ -595,7 +595,7 @@ module RawLine
     # pressed again.
     #
     def complete
-      @input_box.cursor_off
+      @dom.input_box.cursor_off
       completer = @completion_class.new(
         char: @char,
         line: @line,
@@ -613,7 +613,7 @@ module RawLine
           if leftover_bytes.any?
             @keyboard_input_processors.last.read_bytes(leftover_bytes)
           end
-          @input_box.cursor_on
+          @dom.input_box.cursor_on
         },
         keys: terminal.keys
       )
@@ -781,25 +781,22 @@ module RawLine
 
     private
 
-    def build_dom_tree
-      @prompt_box = TerminalLayout::Box.new(content: "default-prompt>", style: {display: :inline})
-      @input_box = TerminalLayout::InputBox.new(content: "", style: {display: :inline})
-      @content_box = TerminalLayout::Box.new(content: "", style: {display: :block})
-      TerminalLayout::Box.new(children:[@prompt_box, @input_box, @content_box])
-    end
+    def initialize_events
+      @event_registry = Rawline::EventRegistry.new do |registry|
+        registry.subscribe :default, -> (_) { self.check_for_keyboard_input }
+        registry.subscribe :dom_tree_change, -> (_) { self.render }
+      end
+      @event_loop = Rawline::EventLoop.new(registry: @event_registry)
 
-    def setup_renderer
       @dom.on(:child_changed) do |*args|
         @event_loop.add_event name: "render", source: @dom#, target: event[:target]
       end
 
       @dom.on :cursor_position_changed do |*args|
-        @renderer.render_cursor(@input_box)
+        @renderer.render_cursor(@dom.input_box)
       end
 
       @event_registry.subscribe :render, -> (_) { render(reset: false) }
-
-      @renderer
     end
 
     def render(reset: false)
@@ -808,11 +805,11 @@ module RawLine
     end
 
     def initialize_line
-      @input_box.content = ""
+      @dom.input_box.content = ""
       update_word_separator
       @add_history = true #add_history
       @line = Line.new(@line_history_size) do |l|
-        l.prompt = @prompt_box.content
+        l.prompt = @dom.prompt_box.content
         l.word_separator = @word_separator
       end
       add_to_line_history

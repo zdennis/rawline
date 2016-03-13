@@ -56,6 +56,7 @@ require "#{dir}/rawline/event_registry"
 require "#{dir}/rawline/keycode_parser"
 require "#{dir}/rawline/non_blocking_input_reader"
 require "#{dir}/rawline/renderer"
+require "#{dir}/rawline/dom_tree"
 require "#{dir}/rawline/editor"
 
 module RawLine

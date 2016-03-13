@@ -25,7 +25,7 @@ end
 describe RawLine::Editor do
   let(:input) { StringIO.new }
   let(:output) { StringIO.new }
-  let(:renderer_klass){ double(RawLine::Renderer, new: renderer) }
+  let(:dom) { RawLine::DomTree.new }
   let(:renderer) do
     instance_double(RawLine::Renderer,
       render_cursor: nil,
@@ -35,15 +35,14 @@ describe RawLine::Editor do
   let(:input_reader) { DummyInputReader.new(input) }
   let(:terminal) do
     output = double("IO", cooked: nil)
-    RawLine::VT220Terminal.new(output)
+    RawLine::VT220Terminal.new(input, output)
   end
 
   before do
     @editor = RawLine::Editor.new(
-      input: input,
-      output: output,
+      dom: dom,
       input_reader: input_reader,
-      renderer_klass: renderer_klass,
+      renderer: renderer,
       terminal: terminal
     ) do |editor|
       editor.prompt = ">"
@@ -58,7 +57,7 @@ describe RawLine::Editor do
     input.rewind
     @editor.event_loop.tick
     expect(@editor.line.text).to eq("test #1")
-    expect(@editor.input_box.content).to eq("test #1")
+    expect(@editor.dom.input_box.content).to eq("test #1")
   end
 
   it "can bind keys to code blocks" do
