@@ -46,7 +46,6 @@ module RawLine
     attr_accessor :completion_class, :completion_proc, :line, :history, :completion_append_string
     attr_accessor :match_hidden_files
     attr_accessor :word_break_characters
-    attr_reader :output
     attr_accessor :dom
 
     # TODO: dom traversal for lookup rather than assignment
@@ -69,7 +68,6 @@ module RawLine
       end
 
       new(
-        output: output,
         input_reader: NonBlockingInputReader.new(input),
         terminal: terminal,
         &blk
@@ -90,8 +88,7 @@ module RawLine
     # * <tt>@completion_append_string</tt> - a string to append to completed words ('').
     # * <tt>@terminal</tt> -  a RawLine::Terminal containing character key codes.
     #
-    def initialize(output:, renderer_klass: RawLine::Renderer, input_reader:, terminal:)
-      @output = output
+    def initialize(renderer_klass: RawLine::Renderer, input_reader:, terminal:)
       @input_reader = input_reader
       @terminal = terminal
 
@@ -126,9 +123,9 @@ module RawLine
 
       @renderer ||= renderer_klass.new(
         dom: @dom,
-        output: @output,
-        width: terminal_width,
-        height: terminal_height
+        output: terminal.output,
+        width: terminal.width,
+        height: terminal.height
       )
       setup_renderer
       initialize_line
@@ -229,7 +226,7 @@ module RawLine
           @terminal.snapshot_tty_attrs
           @terminal.pseudo_cooked!
 
-          @output.puts
+          @terminal.puts
 
           @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup }
           @event_loop.add_event(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
@@ -352,10 +349,6 @@ module RawLine
     # This action is bound to ctrl+k by default.
     #
     def clear_line
-      # @output.putc ?\r
-      # @output.print @line.prompt
-      # @line.length.times {  @output.putc ?\s.ord }
-      # @line.length.times {  @output.putc ?\b.ord }
       add_to_line_history
       @line.text = ""
       @line.position = 0
@@ -397,8 +390,6 @@ module RawLine
       unless @line.position > @line.eol
         # save characters to shift
         chars = (@line.eol?) ? ' ' : select_characters_from_cursor(1)
-        # remove character from console and shift characters
-        # (chars.length+1).times { # @output.putc ?\b.ord }
         #remove character from line
         @line[@line.position] = ''
         @input_box.content = @line.text
@@ -543,7 +534,7 @@ module RawLine
     ############################################################################
 
     #
-    # Write a character to <tt># @output</tt> at cursor position,
+    # Write a character to <tt>output</tt> at cursor position,
     # shifting characters as appropriate.
     # If <tt>no_line_history</tt> is set to <tt>true</tt>, the updated
     # won't be saved in the history of the current line.
@@ -567,7 +558,7 @@ module RawLine
     end
 
     #
-    # Write to <tt>@output</tt> and then immediately re-render.
+    # Write to <tt>output</tt> and then immediately re-render.
     #
     def puts(*args)
       @terminal.puts(*args)
@@ -699,8 +690,6 @@ module RawLine
     def show_history
       pos = @line.position
       text = @line.text
-      # @output.puts
-      # @output.puts "History:"
       @history.each {|l| puts "- [#{l}]"}
       overwrite_line(text, pos)
     end
@@ -780,12 +769,12 @@ module RawLine
       pos = @line.position
       text = @line.text
       word = @line.word
-      # @output.puts
-      # @output.puts "Text: [#{text}]"
-      # @output.puts "Length: #{@line.length}"
-      # @output.puts "Position: #{pos}"
-      # @output.puts "Character at Position: [#{text[pos].chr}] (#{text[pos]})" unless pos >= @line.length
-      # @output.puts "Current Word: [#{word[:text]}] (#{word[:start]} -- #{word[:end]})"
+      # terminal.puts
+      # terminal.puts "Text: [#{text}]"
+      # terminal.puts "Length: #{@line.length}"
+      # terminal.puts "Position: #{pos}"
+      # terminal.puts "Character at Position: [#{text[pos].chr}] (#{text[pos]})" unless pos >= @line.length
+      # terminal.puts "Current Word: [#{word[:text]}] (#{word[:start]} -- #{word[:end]})"
       clear_line
       overwrite_line(text, pos)
     end
@@ -948,29 +937,15 @@ module RawLine
   end
 
   if RawLine.ansi? then
-
     class Editor
-
       if RUBY_PLATFORM.match(/mswin/) && RawLine.win32console? then
         def escape(string)
           string.each_byte { |c| @win32_io.putc c }
         end
       else
         def escape(string)
-          # @output.print string
+          # @terminal.print string
         end
-      end
-
-      def terminal_width
-        terminal_size[0]
-      end
-
-      def terminal_height
-        terminal_size[1]
-      end
-
-      def cursor_position
-        terminal.cursor_position
       end
     end
   end

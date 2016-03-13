@@ -26,7 +26,7 @@ module RawLine
   class Terminal
     include HighLine::SystemExtensions
 
-    attr_accessor :escape_codes
+    attr_accessor :escape_codes, :input, :output
     attr_reader :keys, :escape_sequences
 
     #
@@ -172,6 +172,18 @@ module RawLine
       blk.call
     ensure
       term_info.control "rc" # restore cursor position
+    end
+
+    def width
+      terminal_size[0]
+    end
+
+    def height
+      terminal_size[1]
+    end
+
+    def cursor_position
+      cursor_position
     end
 
     #
