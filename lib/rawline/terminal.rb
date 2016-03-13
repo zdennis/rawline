@@ -3,6 +3,7 @@
 require 'terminfo'
 require 'io/console'
 require 'ostruct'
+require 'termios'
 
 #
 #  terminal.rb
@@ -23,7 +24,6 @@ module RawLine
   # RawLine::Editor.
   #
   class Terminal
-
     include HighLine::SystemExtensions
 
     attr_accessor :escape_codes
@@ -32,8 +32,10 @@ module RawLine
     #
     # Create an instance of RawLine::Terminal.
     #
-    def initialize(output)
+    def initialize(input, output)
+      @input = input
       @output = output
+      @snapshotted_tty_attrs = []
       @keys =
         {
         :tab => [?\t.ord],
@@ -74,6 +76,33 @@ module RawLine
     end
 
     CursorPosition = Struct.new(:column, :row)
+
+    def raw!
+      @input.raw!
+    end
+
+    def cooked!
+      @input.cooked!
+    end
+
+    def pseudo_cooked!
+      old_tty_attrs = Termios.tcgetattr(@input)
+      new_tty_attrs = old_tty_attrs.dup
+
+      new_tty_attrs.cflag |= Termios::BRKINT | Termios::ISTRIP | Termios::ICRNL | Termios::IXON
+      new_tty_attrs.oflag |= Termios::OPOST
+      new_tty_attrs.lflag |= Termios::ECHO | Termios::ECHOE | Termios::ECHOK | Termios::ECHONL | Termios::ICANON | Termios::ISIG | Termios::IEXTEN
+
+      Termios::tcsetattr(@input, Termios::TCSANOW, new_tty_attrs)
+    end
+
+    def snapshot_tty_attrs
+      @snapshotted_tty_attrs << Termios.tcgetattr(@input)
+    end
+
+    def restore_tty_attrs
+      Termios::tcsetattr(@input, Termios::TCSANOW, @snapshotted_tty_attrs.pop)
+    end
 
     def cursor_position
       res = ''

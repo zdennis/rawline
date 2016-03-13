@@ -12,7 +12,9 @@ module RawLine
     #  * source
     #  * target
     #  * payload
-    def add_event(**event)
+    def add_event(**event, &blk)
+      event[:_callback] = blk if blk
+
       # if the last event is the same as the incoming then do there is no
       # need to add it again. For example, rendering events that already
       # back can be squashed into a single event.
@@ -77,6 +79,9 @@ module RawLine
       @registry.subscribers_for_event(event[:name]).each do |subscriber|
         subscriber.call(event)
       end
+
+      callback = event[:_callback]
+      callback.call(event) if callback
     end
   end
 end

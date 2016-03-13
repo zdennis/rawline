@@ -55,20 +55,22 @@ module RawLine
     def self.create(&blk)
       terminal = nil
 
+      input = STDIN
+      output = STDOUT
+
       case RUBY_PLATFORM
       when /mswin/i then
-        terminal = WindowsTerminal.new(STDOUT)
+        terminal = WindowsTerminal.new(input, output)
         if RawLine.win32console? then
           win32_io = Win32::Console::ANSI::IO.new
         end
       else
-        terminal = VT220Terminal.new(STDOUT)
+        terminal = VT220Terminal.new(input, output)
       end
 
       new(
-        input: STDIN,
-        output: STDOUT,
-        input_reader: NonBlockingInputReader.new(STDIN),
+        output: output,
+        input_reader: NonBlockingInputReader.new(input),
         terminal: terminal,
         &blk
       )
@@ -88,10 +90,9 @@ module RawLine
     # * <tt>@completion_append_string</tt> - a string to append to completed words ('').
     # * <tt>@terminal</tt> -  a RawLine::Terminal containing character key codes.
     #
-    def initialize(input:, output:, renderer_klass: RawLine::Renderer, input_reader:, terminal:)
-      @input = input
+    def initialize(output:, renderer_klass: RawLine::Renderer, input_reader:, terminal:)
       @output = output
-      @input_reader = input_reader || NonBlockingInputReader.new(@input)
+      @input_reader = input_reader
       @terminal = terminal
 
       @history_size = 30
@@ -165,8 +166,8 @@ module RawLine
     # Starts the editor event loop. Must be called before the editor
     # can be interacted with.
     def start
-      @input.raw!
-      at_exit { @input.cooked! }
+      @terminal.raw!
+      at_exit { @terminal.cooked! }
 
       Signal.trap("SIGWINCH") do
         @event_loop.add_event name: "terminal-resized", source: self
@@ -225,18 +226,13 @@ module RawLine
           # @allow_prompt_updates = false
           move_to_beginning_of_input
 
-          old_tty_attrs = Termios.tcgetattr(@input)
-          new_tty_attrs = old_tty_attrs.dup
+          @terminal.snapshot_tty_attrs
+          @terminal.pseudo_cooked!
 
-          new_tty_attrs.cflag |= Termios::BRKINT | Termios::ISTRIP | Termios::ICRNL | Termios::IXON
-          new_tty_attrs.oflag |= Termios::OPOST
-          new_tty_attrs.lflag |= Termios::ECHO | Termios::ECHOE | Termios::ECHOK | Termios::ECHONL | Termios::ICANON | Termios::ISIG | Termios::IEXTEN
-
-          Termios::tcsetattr(@input, Termios::TCSANOW, new_tty_attrs)
           @output.puts
 
           @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup }
-          @event_loop.add_event name: "reset_tty_attrs", source: self, payload: { fd: @input, tty_attrs: old_tty_attrs }
+          @event_loop.add_event(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
           @event_loop.add_event name: "render", source: self, payload: { reset: true }
         end
       end
@@ -342,11 +338,7 @@ module RawLine
 
     def on_read_line(&blk)
       @event_registry.subscribe :line_read, &blk
-      @event_registry.subscribe :reset_tty_attrs do |event|
-        Termios::tcsetattr(event[:payload][:fd], Termios::TCSANOW, event[:payload][:tty_attrs])
-      end
     end
-
 
     ############################################################################
     #
