@@ -1,10 +1,10 @@
 module RawLine
-  class NonBlockingInputReader
+  class NonBlockingInput
     def initialize(input)
       @input = input
     end
 
-    def read_bytes
+    def read
       bytes = []
       begin
         file_descriptor_flags = @input.fcntl(Fcntl::F_GETFL, 0)

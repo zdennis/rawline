@@ -78,7 +78,7 @@ module RawLine
 
       new(
         dom: dom,
-        input_reader: NonBlockingInputReader.new(input),
+        input: NonBlockingInput.new(input),
         renderer: renderer,
         terminal: terminal,
         &blk
@@ -99,9 +99,9 @@ module RawLine
     # * <tt>@completion_append_string</tt> - a string to append to completed words ('').
     # * <tt>@terminal</tt> -  a RawLine::Terminal containing character key codes.
     #
-    def initialize(dom:, input_reader:, renderer:, terminal:)
+    def initialize(dom:, input:, renderer:, terminal:)
       @dom = dom
-      @input_reader = input_reader
+      @input = input
       @renderer = renderer
       @terminal = terminal
 
@@ -197,7 +197,7 @@ module RawLine
     ############################################################################
 
     def check_for_keyboard_input
-      bytes = @input_reader.read_bytes
+      bytes = @input.read
       if bytes.any?
         @keyboard_input_processors.last.read_bytes(bytes)
       end

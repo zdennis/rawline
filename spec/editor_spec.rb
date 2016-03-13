@@ -12,19 +12,25 @@ end
 require 'stringio'
 require_relative "../lib/rawline.rb"
 
-class DummyInputReader < RawLine::NonBlockingInputReader
+class DummyInput < RawLine::NonBlockingInput
   def initialize(input)
     @input = input
   end
 
-  def read_bytes
+  def read
     @input.read.bytes
+  end
+
+  def <<(bytes)
+    @input << bytes
+  end
+
+  def rewind
+    @input.rewind
   end
 end
 
 describe RawLine::Editor do
-  let(:input) { StringIO.new }
-  let(:output) { StringIO.new }
   let(:dom) { RawLine::DomTree.new }
   let(:renderer) do
     instance_double(RawLine::Renderer,
@@ -32,7 +38,7 @@ describe RawLine::Editor do
       render: nil
     )
   end
-  let(:input_reader) { DummyInputReader.new(input) }
+  let(:input) { DummyInput.new(StringIO.new) }
   let(:terminal) do
     output = double("IO", cooked: nil)
     RawLine::VT220Terminal.new(input, output)
@@ -41,7 +47,7 @@ describe RawLine::Editor do
   before do
     @editor = RawLine::Editor.new(
       dom: dom,
-      input_reader: input_reader,
+      input: input,
       renderer: renderer,
       terminal: terminal
     ) do |editor|
