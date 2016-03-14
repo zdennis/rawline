@@ -154,6 +154,13 @@ module RawLine
       render(reset: true)
     end
 
+    def terminal_width ; @terminal.width ; end
+    def terminal_height ; @terminal.height ; end
+
+    def content_box ; @dom.content_box ; end
+    def input_box ; @dom.input_box ; end
+    def prompt_box ; @dom.prompt_box ; end
+
     ############################################################################
     #
     #                                EVENTS
