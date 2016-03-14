@@ -21,5 +21,10 @@ module RawLine
     def render_cursor(input_box)
       @renderer.render_cursor(input_box)
     end
+
+    def update_dimensions(width:, height:)
+      @render_tree.width = width
+      @render_tree.height = height
+    end
   end
 end

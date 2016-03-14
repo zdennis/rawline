@@ -178,8 +178,7 @@ module RawLine
       end
 
       @event_registry.subscribe("terminal-resized") do
-        @render_tree.width = terminal_width
-        @render_tree.height = terminal_height
+        @renderer.update_dimensions(width: terminal_width, height: terminal_height)
         @event_loop.add_event name: "render", source: self
       end
 
