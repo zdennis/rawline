@@ -23,6 +23,10 @@ module RawLine
       end
     end
 
+    def clear
+      @events.clear
+    end
+
     def recur(event:nil, interval_in_ms:, &blk)
       if block_given?
         # TODO: implement
