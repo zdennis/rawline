@@ -27,25 +27,32 @@ module RawLine
       @events.clear
     end
 
-    def recur(event:nil, interval_in_ms:, &blk)
-      if block_given?
-        # TODO: implement
-      elsif event
-        add_event event.merge(recur: { interval_in_ms: interval_in_ms, recur_at: recur_at(interval_in_ms) })
-      else
-        raise "Must pass in a block or an event."
-      end
+    def once(interval_in_ms:, **event, &blk)
+      add_event event.merge(once: { run_at: recur_at(interval_in_ms) }), &blk
+    end
+
+    def recur(interval_in_ms:, &blk)
+      add_event event.merge(recur: { interval_in_ms: interval_in_ms, recur_at: recur_at(interval_in_ms) }), &blk
     end
 
     def tick
       event = @events.shift
       if event
         recur = event[:recur]
+        once = event[:once]
         if recur
           if current_time_in_ms >= recur[:recur_at]
             dispatch_event(event)
             interval_in_ms = recur[:interval_in_ms]
             add_event event.merge(recur: { interval_in_ms: interval_in_ms, recur_at: recur_at(interval_in_ms) } )
+          else
+            # put it back on the queue
+            add_event event
+            dispatch_event(default_event)
+          end
+        elsif once
+          if current_time_in_ms >= once[:run_at]
+            dispatch_event(event)
           else
             # put it back on the queue
             add_event event
