@@ -388,6 +388,11 @@ module RawLine
       @history.clear_position
     end
 
+    def clear_screen
+      @terminal.clear_screen
+      render(reset: true)
+    end
+
     #
     # Delete the character at the left of the cursor.
     # If <tt>no_line_hisytory</tt> is set to true, the deletion won't be
