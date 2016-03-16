@@ -305,4 +305,11 @@ describe RawLine::Editor do
     expect(@editor.line.text).to eq("test #1test #1")
   end
 
+  describe '#puts' do
+    it 'puts to the terminal, then re-renders' do
+      expect(terminal).to receive(:puts).with("A", "B", "C").ordered
+      expect(renderer).to receive(:render).with(reset: true)
+      @editor.puts("A", "B", "C")
+    end
+  end
 end

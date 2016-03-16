@@ -14,8 +14,7 @@ module RawLine
 
     def render(reset: false)
       @render_tree.layout
-      @renderer.reset if reset
-      @renderer.render(@render_tree)
+      @renderer.render(@render_tree, reset: reset)
     end
 
     def render_cursor(input_box)

@@ -568,7 +568,7 @@ module RawLine
     #
     def puts(*args)
       @terminal.puts(*args)
-      render
+      render(reset: true)
     end
 
     #
