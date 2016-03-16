@@ -1,7 +1,16 @@
 module RawLine
   class NonBlockingInput
+    DEFAULT_WAIT_TIMEOUT_IN_SECONDS = 0.01
+
+    attr_accessor :wait_timeout_in_seconds
+
     def initialize(input)
       @input = input
+      restore_default_timeout
+    end
+
+    def restore_default_timeout
+      @wait_timeout_in_seconds = DEFAULT_WAIT_TIMEOUT_IN_SECONDS
     end
 
     def read
@@ -15,7 +24,7 @@ module RawLine
       rescue IO::WaitReadable
         # reset flags so O_NONBLOCK is turned off on the file descriptor
         # if it was turned on during the read_nonblock above
-        retry if IO.select([@input], [], [], 0.01)
+        retry if IO.select([@input], [], [], @wait_timeout_in_seconds)
 
         @input.fcntl(Fcntl::F_SETFL, file_descriptor_flags)
       end

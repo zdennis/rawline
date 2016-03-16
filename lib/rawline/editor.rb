@@ -131,7 +131,8 @@ module RawLine
       initialize_line
     end
 
-    attr_reader :dom, :event_loop
+    attr_reader :dom, :event_loop, :input
+    attr_reader :keyboard_input_processors
 
     #
     # Return the current RawLine version
