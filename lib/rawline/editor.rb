@@ -227,19 +227,23 @@ module RawLine
 
         @ignore_position_change = false
         if @char == @terminal.keys[:enter] || !@char
-          # @allow_prompt_updates = false
-          move_to_beginning_of_input
-
-          @terminal.snapshot_tty_attrs
-          @terminal.pseudo_cooked!
-
-          @terminal.puts
-
-          @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup }
-          @event_loop.add_event(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
-          @event_loop.add_event name: "render", source: self, payload: { reset: true }
+          process_line
         end
       end
+    end
+
+    def process_line
+      # @allow_prompt_updates = false
+      move_to_beginning_of_input
+
+      @terminal.snapshot_tty_attrs
+      @terminal.pseudo_cooked!
+
+      @terminal.puts
+
+      @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup }
+      @event_loop.add_event(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
+      @event_loop.add_event name: "render", source: self, payload: { reset: true }
     end
 
     #
@@ -295,6 +299,27 @@ module RawLine
         bind_hash(key, block)
       else
         raise BindingException, "Unable to bind '#{key.to_s}' (#{key.class.to_s})"
+      end
+      @terminal.update
+    end
+
+    def unbind(key)
+      case key.class.to_s
+      when 'Symbol' then
+        @keys.delete @terminal.keys[key]
+      when 'Array' then
+        @keys.delete @keys[key]
+      when 'Fixnum' then
+        @keys.delete[[key]]
+      when 'String' then
+        if key.length == 1 then
+          @keys.delete[[key.ord]]
+        else
+          bind_hash({:"#{key}" => key}, block)
+        end
+      when 'Hash' then
+        raise BindingException, "Cannot bind more than one key or key sequence at once" unless key.values.length == 1
+        bind_hash(key, -> { })
       end
       @terminal.update
     end
