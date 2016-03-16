@@ -89,9 +89,15 @@ module RawLine
       old_tty_attrs = Termios.tcgetattr(@input)
       new_tty_attrs = old_tty_attrs.dup
 
+
       new_tty_attrs.cflag |= Termios::BRKINT | Termios::ISTRIP | Termios::ICRNL | Termios::IXON
+
+      new_tty_attrs.iflag |= Termios::ICRNL | Termios::IGNBRK
+
       new_tty_attrs.oflag |= Termios::OPOST
-      new_tty_attrs.lflag |= Termios::ECHO | Termios::ECHOE | Termios::ECHOK | Termios::ECHONL | Termios::ICANON | Termios::ISIG | Termios::IEXTEN
+
+      new_tty_attrs.lflag &= ~Termios::ECHONL
+      new_tty_attrs.lflag |= Termios::ECHO | Termios::ECHOE | Termios::ECHOK | Termios::ICANON | Termios::ISIG | Termios::IEXTEN
 
       Termios::tcsetattr(@input, Termios::TCSANOW, new_tty_attrs)
     end
