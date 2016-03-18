@@ -10,7 +10,7 @@ require 'term/ansicolor'
 # puts " * Press CTRL+D for line-related information"
 # puts " * Press CTRL+E to view command history"
 
-editor = RawLine::Editor.new
+editor = RawLine::Editor.create
 kill_ring = []
 
 editor.terminal.keys.merge!(enter: [13])
