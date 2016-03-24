@@ -304,24 +304,26 @@ module RawLine
     end
 
     def unbind(key)
-      case key.class.to_s
-      when 'Symbol' then
-        @keys.delete @terminal.keys[key]
-      when 'Array' then
-        @keys.delete @keys[key]
-      when 'Fixnum' then
-        @keys.delete[[key]]
-      when 'String' then
-        if key.length == 1 then
-          @keys.delete[[key.ord]]
-        else
-          bind_hash({:"#{key}" => key}, block)
+      block = case key.class.to_s
+        when 'Symbol' then
+          @keys.delete @terminal.keys[key]
+        when 'Array' then
+          @keys.delete @keys[key]
+        when 'Fixnum' then
+          @keys.delete[[key]]
+        when 'String' then
+          if key.length == 1 then
+            @keys.delete([key.ord])
+          else
+            raise NotImplementedError, "This is no implemented yet. It needs to return the previously bound block"
+            bind_hash({:"#{key}" => key}, block)
+          end
+        when 'Hash' then
+          raise BindingException, "Cannot bind more than one key or key sequence at once" unless key.values.length == 1
+          bind_hash(key, -> { })
         end
-      when 'Hash' then
-        raise BindingException, "Cannot bind more than one key or key sequence at once" unless key.values.length == 1
-        bind_hash(key, -> { })
-      end
       @terminal.update
+      block
     end
 
     #
@@ -441,12 +443,12 @@ module RawLine
     end
 
     def kill_forward
-      @line.text[@line.position..-1].tap do
-        @line.text = ANSIString.new("")
-        @dom.input_box.content = line.text
-        @dom.input_box.position = @line.position
-        @history.clear_position
-      end
+      killed_text = @line.text[@line.position..-1]
+      @line.text[@line.position..-1] = ANSIString.new("")
+      @dom.input_box.content = line.text
+      @dom.input_box.position = @line.position
+      @history.clear_position
+      killed_text
     end
 
     def yank_forward(text)
