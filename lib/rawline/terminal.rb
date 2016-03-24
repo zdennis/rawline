@@ -42,6 +42,7 @@ module RawLine
         :return => [?\r.ord],
         :newline => [?\n.ord],
         :escape => [?\e.ord],
+        :space => [32],
 
         :ctrl_a => [?\C-a.ord],
         :ctrl_b => [?\C-b.ord],

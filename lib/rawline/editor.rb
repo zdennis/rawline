@@ -932,6 +932,7 @@ module RawLine
     end
 
     def set_default_keys
+      bind(:space) { write(' ') }
       bind(:enter) { newline }
       bind(:tab) { complete }
       bind(:backspace) { delete_left_character }
