@@ -233,13 +233,13 @@ module RawLine
     end
 
     def process_line
-      # @allow_prompt_updates = false
-      move_to_beginning_of_input
+      @event_loop.add_event(name: "process_line", source: self) do
+        @terminal.snapshot_tty_attrs
+        @terminal.pseudo_cooked!
 
-      @terminal.snapshot_tty_attrs
-      @terminal.pseudo_cooked!
-
-      @terminal.puts
+        move_to_beginning_of_input
+        @terminal.puts
+      end
 
       @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup }
       @event_loop.add_event(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
