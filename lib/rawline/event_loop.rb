@@ -5,6 +5,7 @@ module RawLine
     def initialize(registry:)
       @registry = registry
       @events = []
+      @counter = 0
     end
 
     # event looks like:
@@ -13,25 +14,40 @@ module RawLine
     #  * target
     #  * payload
     def add_event(**event, &blk)
-      event[:_callback] = blk if blk
+      unless event.has_key?(:_event_callback)
+        event[:_event_callback] = blk if blk
+      end
+
+      unless event.has_key?(:_event_id)
+        @counter += 1
+        event[:_event_id] = @counter
+      end
 
       # if the last event is the same as the incoming then do there is no
       # need to add it again. For example, rendering events that already
       # back can be squashed into a single event.
       if @events.last != event
         @events << event
+        event[:_event_id]
+      else
+        @events.last[:_event_id]
       end
     end
 
-    def clear
+    def clear(event_id)
+      @events = @events.reject { |event| event[:_event_id] == event_id }
+    end
+
+    def reset
       @events.clear
+      @counter = 0
     end
 
     def once(interval_in_ms:, **event, &blk)
       add_event event.merge(once: { run_at: recur_at(interval_in_ms) }), &blk
     end
 
-    def recur(interval_in_ms:, &blk)
+    def recur(interval_in_ms:, **event, &blk)
       add_event event.merge(recur: { interval_in_ms: interval_in_ms, recur_at: recur_at(interval_in_ms) }), &blk
     end
 
@@ -47,7 +63,7 @@ module RawLine
             add_event event.merge(recur: { interval_in_ms: interval_in_ms, recur_at: recur_at(interval_in_ms) } )
           else
             # put it back on the queue
-            add_event event
+            @events << event
             dispatch_event(default_event)
           end
         elsif once
@@ -55,7 +71,8 @@ module RawLine
             dispatch_event(event)
           else
             # put it back on the queue
-            add_event event
+            @events << event
+            # add_event event
             dispatch_event(default_event)
           end
         else
@@ -79,7 +96,7 @@ module RawLine
     end
 
     def default_event
-      { name: 'default', source: self }
+      { name: 'default', source: self, _event_id: -1 }
     end
 
     def recur_at(interval_in_ms)
@@ -91,7 +108,7 @@ module RawLine
         subscriber.call(event)
       end
 
-      callback = event[:_callback]
+      callback = event[:_event_callback]
       callback.call(event) if callback
     end
   end

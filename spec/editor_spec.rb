@@ -138,7 +138,7 @@ describe RawLine::Editor do
           input << arrow_key_left_ansi
           input.rewind
 
-          @editor.event_loop.clear
+          @editor.event_loop.reset
           @editor.event_loop.tick
 
           expect(@editor.line.position).to eq(2)
@@ -156,7 +156,7 @@ describe RawLine::Editor do
           input << arrow_key_right_ansi
           input.rewind
 
-          @editor.event_loop.clear
+          @editor.event_loop.reset
           @editor.event_loop.tick
 
           expect(@editor.line.position).to eq(3)
@@ -172,7 +172,7 @@ describe RawLine::Editor do
           input.clear
           input << arrow_key_left_ansi
           input.rewind
-          @editor.event_loop.clear
+          @editor.event_loop.reset
           @editor.event_loop.tick
 
           # these are for fun to show that we don't generate unnecessary
@@ -182,7 +182,7 @@ describe RawLine::Editor do
           input << arrow_key_left_ansi
           input << arrow_key_left_ansi
           input.rewind
-          @editor.event_loop.clear
+          @editor.event_loop.reset
           @editor.event_loop.tick
 
           # now let's move right again
@@ -191,14 +191,14 @@ describe RawLine::Editor do
           input << arrow_key_right_ansi
           input << arrow_key_right_ansi
           input.rewind
-          @editor.event_loop.clear
+          @editor.event_loop.reset
           @editor.event_loop.tick
 
           # this is the one that puts us on the next line
           input.clear
           input << arrow_key_right_ansi
           input.rewind
-          @editor.event_loop.clear
+          @editor.event_loop.reset
           @editor.event_loop.tick
         end
 
