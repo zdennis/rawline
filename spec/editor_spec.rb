@@ -132,7 +132,7 @@ describe RawLine::Editor do
         it "moves the line and cursor position to left by 1 character" do
           @editor.event_loop.tick
           expect(@editor.line.position).to eq(3)
-          expect(@editor.input_box.cursor_position.x).to eq(3)
+          expect(@editor.input_box.position).to eq(3)
 
           input.clear
           input << arrow_key_left_ansi
@@ -142,7 +142,7 @@ describe RawLine::Editor do
           @editor.event_loop.tick
 
           expect(@editor.line.position).to eq(2)
-          expect(@editor.input_box.cursor_position.x).to eq(2)
+          expect(@editor.input_box.position).to eq(2)
         end
       end
 
@@ -150,7 +150,7 @@ describe RawLine::Editor do
         it "doesnt move the line and cursor position" do
           @editor.event_loop.tick
           expect(@editor.line.position).to eq(3)
-          expect(@editor.input_box.cursor_position.x).to eq(3)
+          expect(@editor.input_box.position).to eq(3)
 
           input.clear
           input << arrow_key_right_ansi
@@ -160,7 +160,7 @@ describe RawLine::Editor do
           @editor.event_loop.tick
 
           expect(@editor.line.position).to eq(3)
-          expect(@editor.input_box.cursor_position.x).to eq(3)
+          expect(@editor.input_box.position).to eq(3)
         end
       end
 
@@ -204,7 +204,7 @@ describe RawLine::Editor do
 
         it "correctly sets the line and cursor position" do
           expect(@editor.line.position).to eq(3)
-          expect(@editor.input_box.cursor_position.x).to eq(3)
+          expect(@editor.input_box.position).to eq(3)
         end
       end
     end
