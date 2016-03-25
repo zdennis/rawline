@@ -831,7 +831,7 @@ module RawLine
         @event_loop.add_event name: "render", source: @dom#, target: event[:target]
       end
 
-      @dom.on :cursor_position_changed do |*args|
+      @dom.on :position_changed do |*args|
         @renderer.render_cursor(@dom.input_box)
       end
 
