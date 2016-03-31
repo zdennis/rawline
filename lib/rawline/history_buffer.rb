@@ -50,10 +50,6 @@ module RawLine
       !!@position
     end
 
-    def supports_partial_text_matching?
-      false
-    end
-
     #
     # Resize the buffer, resetting <tt>@position</tt> to nil.
     #

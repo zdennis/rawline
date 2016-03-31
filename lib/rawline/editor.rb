@@ -41,7 +41,7 @@ module RawLine
     extend Forwardable
     include HighLine::SystemExtensions
 
-    attr_accessor :char, :history_size, :line_history_size, :highlight_history_matching_text
+    attr_accessor :char, :history_size, :line_history_size
     attr_accessor :terminal, :keys, :mode
     attr_accessor :completion_class, :completion_proc, :line, :history, :completion_append_string
     attr_accessor :match_hidden_files
@@ -116,7 +116,6 @@ module RawLine
       @match_hidden_files = false
       set_default_keys
       @add_history = false
-      @highlight_history_matching_text = true
       @history = HistoryBuffer.new(@history_size) do |h|
         h.duplicates = false;
         h.exclude = lambda { |item| item.strip == "" }
@@ -221,11 +220,6 @@ module RawLine
 
         new_position = @line.position
 
-        if !@ignore_position_change && new_position != old_position
-          @matching_text = @line.text[0...@line.position]
-        end
-
-        @ignore_position_change = false
         if @char == @terminal.keys[:enter] || !@char
           process_line
         end
@@ -543,7 +537,6 @@ module RawLine
         new_line = highlight_text_up_to(new_line, options[:highlight_up_to])
       end
 
-      @ignore_position_change = true
       @line.position = position || new_line.length
       @line.text = new_line
       @dom.input_box.content = @line.text
@@ -891,36 +884,21 @@ module RawLine
 
     def generic_history_back(history)
       unless history.empty?
-        history.back(matching_text: matching_text)
+        history.back
         line = history.get
         return unless line
 
         cursor_position = nil
-        if supports_partial_text_matching? && highlight_history_matching_text
-          if line && matching_text
-            cursor_position = [line.length, matching_text.length].min
-          elsif matching_text
-            cursor_position = matching_text.length
-          end
-        end
-
         overwrite_line(line, cursor_position, highlight_up_to: cursor_position)
       end
     end
 
-    def supports_partial_text_matching?
-      history.supports_partial_text_matching?
-    end
-
     def generic_history_forward(history)
-      if history.forward(matching_text: matching_text)
+      if history.forward
         line = history.get
         return unless line
 
-        cursor_position = if supports_partial_text_matching? && highlight_history_matching_text && matching_text
-          [line.length, matching_text.length].min
-        end
-
+        cursor_position = nil
         overwrite_line(line, cursor_position, highlight_up_to: cursor_position)
       end
     end
@@ -948,16 +926,6 @@ module RawLine
       bind(:down_arrow) { history_forward }
       bind(:delete) { delete_character }
       bind(:insert) { toggle_mode }
-    end
-
-    def matching_text
-      return nil unless @line
-      return nil if @line.text == ""
-      if @history.searching?
-        @matching_text
-      else
-        @matching_text = @line[0...@line.position]
-      end
     end
 
     def terminal_row_for_line_position(line_position)
