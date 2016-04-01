@@ -38,7 +38,18 @@ module RawLine
       elsif bytes.map(&:ord) != @completion_char
         @done_proc.call(bytes)
       elsif @first_time
-        matches = @completion_proc.call(sub_word, @line.text) unless !@completion_proc || @completion_proc == []
+        unless !@completion_proc || @completion_proc == []
+          word = @line.text[@line.word[:start]..@line.position-1] || ""
+          words = @line.text
+            .split(/\s+/)
+            .delete_if(&:empty?)
+          word_index = words.index(word)
+          matches = @completion_proc.call(
+            word,
+            words,
+            word_index
+          )
+        end
         matches = matches.to_a.compact.sort.reverse
 
         if matches.any?
@@ -63,12 +74,6 @@ module RawLine
 
         @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
       end
-    end
-
-    private
-
-    def sub_word
-      @line.text[@line.word[:start]..@line.position-1] || ""
     end
   end
 
