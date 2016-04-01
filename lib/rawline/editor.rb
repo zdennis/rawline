@@ -108,7 +108,7 @@ module RawLine
       @history_size = 30
       @line_history_size = 50
       @keys = {}
-      @word_break_characters = " \t\n\"'@\$><=;|&{("
+      @word_break_characters = " \t\n\"'@><=;|&{("
       @mode = :insert
       @completion_class = Completer
       @completion_proc = filename_completion_proc
