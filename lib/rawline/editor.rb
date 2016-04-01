@@ -41,9 +41,9 @@ module RawLine
     extend Forwardable
     include HighLine::SystemExtensions
 
-    attr_accessor :char, :history_size, :line_history_size
-    attr_accessor :terminal, :keys, :mode
-    attr_accessor :completion_class, :completion_proc, :line, :history, :completion_append_string
+    attr_accessor :char
+    attr_accessor :terminal, :mode
+    attr_accessor :completion_proc, :line, :history
     attr_accessor :match_hidden_files
     attr_accessor :word_break_characters
     attr_accessor :dom
@@ -85,18 +85,42 @@ module RawLine
       )
     end
 
+    class Environment
+      attr_accessor :keys, :completion_class, :history, :word_separator
+
+      # * <tt>@history_size</tt> - the size of the editor history buffer (30).
+      # * <tt>@keys</tt> - the keys (arrays of character codes) bound to specific actions.
+      # * <tt>@line_history_size</tt> - the size of the editor line history buffer (50).
+      def initialize(env: nil)
+        @env = env
+        @keys = {}
+
+        @completion_class = Completer
+
+        @line_history_size = 50
+        @history_size = 30
+
+        @history = HistoryBuffer.new(@history_size) do |h|
+          h.duplicates = false;
+          h.exclude = lambda { |item| item.strip == "" }
+        end
+      end
+
+      def initialize_line(&blk)
+        Line.new(@line_history_size) do |line|
+          blk.call(line) if blk
+        end
+      end
+    end
+
     #
     # Create an instance of RawLine::Editor which can be used
     # to read from input and perform line-editing operations.
     # This method takes an optional block used to override the
     # following instance attributes:
-    # * <tt>@history_size</tt> - the size of the editor history buffer (30).
-    # * <tt>@line_history_size</tt> - the size of the editor line history buffer (50).
-    # * <tt>@keys</tt> - the keys (arrays of character codes) bound to specific actions.
     # * <tt>@word_break_characters</tt> - a regex used for word separation, default inclues: " \t\n\"\\'`@$><=;|&{("
     # * <tt>@mode</tt> - The editor's character insertion mode (:insert).
     # * <tt>@completion_proc</tt> - a Proc object used to perform word completion.
-    # * <tt>@completion_append_string</tt> - a string to append to completed words ('').
     # * <tt>@terminal</tt> -  a RawLine::Terminal containing character key codes.
     #
     def initialize(dom:, input:, renderer:, terminal:)
@@ -105,23 +129,17 @@ module RawLine
       @renderer = renderer
       @terminal = terminal
 
-      @history_size = 30
-      @line_history_size = 50
-      @keys = {}
+      @env_stack = [Environment.new]
+
       @word_break_characters = " \t\n\"'@><=;|&{("
       @mode = :insert
-      @completion_class = Completer
+
       @completion_proc = filename_completion_proc
-      @completion_append_string = ''
+
       @match_hidden_files = false
       set_default_keys
       @add_history = false
-      @history = HistoryBuffer.new(@history_size) do |h|
-        h.duplicates = false;
-        h.exclude = lambda { |item| item.strip == "" }
-      end
       @keyboard_input_processors = [self]
-      # @allow_prompt_updates = true
       yield self if block_given?
       update_word_separator
       @char = nil
@@ -132,6 +150,12 @@ module RawLine
 
     attr_reader :dom, :event_loop, :input
     attr_reader :keyboard_input_processors
+
+    def env ; @env_stack.last ; end
+
+    def completion_class ; env.completion_class ; end
+    def history ; env.history ; end
+    def keys ; env.keys ; end
 
     #
     # Return the current RawLine version
@@ -275,16 +299,16 @@ module RawLine
       case key.class.to_s
       when 'Symbol' then
         raise BindingException, "Unknown key or key sequence '#{key.to_s}' (#{key.class.to_s})" unless @terminal.keys[key]
-        @keys[@terminal.keys[key]] = block
+        keys[@terminal.keys[key]] = block
       when 'Array' then
         raise BindingException, "Unknown key or key sequence '#{key.join(", ")}' (#{key.class.to_s})" unless @terminal.keys.has_value? key
-        @keys[key] = block
+        keys[key] = block
       when 'Fixnum' then
         raise BindingException, "Unknown key or key sequence '#{key.to_s}' (#{key.class.to_s})" unless @terminal.keys.has_value? [key]
-        @keys[[key]] = block
+        keys[[key]] = block
       when 'String' then
         if key.length == 1 then
-          @keys[[key.ord]] = block
+          keys[[key.ord]] = block
         else
           bind_hash({:"#{key}" => key}, block)
         end
@@ -300,14 +324,14 @@ module RawLine
     def unbind(key)
       block = case key.class.to_s
         when 'Symbol' then
-          @keys.delete @terminal.keys[key]
+          keys.delete @terminal.keys[key]
         when 'Array' then
-          @keys.delete @keys[key]
+          keys.delete keys[key]
         when 'Fixnum' then
-          @keys.delete[[key]]
+          keys.delete[[key]]
         when 'String' then
           if key.length == 1 then
-            @keys.delete([key.ord])
+            keys.delete([key.ord])
           else
             raise NotImplementedError, "This is no implemented yet. It needs to return the previously bound block"
             bind_hash({:"#{key}" => key}, block)
@@ -324,7 +348,7 @@ module RawLine
     # Return true if the last character read via <tt>read</tt> is bound to an action.
     #
     def key_bound?
-      @keys[@char] ? true : false
+      keys[@char] ? true : false
     end
 
     #
@@ -332,7 +356,7 @@ module RawLine
     # This method is called automatically by <tt>process_character</tt>.
     #
     def press_key
-      @keys[@char].call
+      keys[@char].call
     end
 
     #
@@ -358,7 +382,7 @@ module RawLine
     #
     def newline
       add_to_history
-			@history.clear_position
+			history.clear_position
     end
 
     def on_read_line(&blk)
@@ -381,7 +405,7 @@ module RawLine
       @line.text = ""
       @line.position = 0
       @dom.input_box.position = @line.position
-      @history.clear_position
+      history.clear_position
     end
 
     def clear_screen
@@ -410,7 +434,7 @@ module RawLine
       @dom.input_box.position = @line.position
       @dom.input_box.content = @line.text
       add_to_line_history unless no_line_history
-      @history.clear_position
+      history.clear_position
     end
 
     #
@@ -428,7 +452,7 @@ module RawLine
         @dom.input_box.content = @line.text
         @dom.input_box.position = @line.position
         add_to_line_history unless no_line_history
-        @history.clear_position
+        history.clear_position
       end
     end
 
@@ -441,7 +465,7 @@ module RawLine
       @line.text[@line.position..-1] = ANSIString.new("")
       @dom.input_box.content = line.text
       @dom.input_box.position = @line.position
-      @history.clear_position
+      history.clear_position
       killed_text
     end
 
@@ -450,7 +474,7 @@ module RawLine
       @line.position = line.position + text.length
       @dom.input_box.content = line.text
       @dom.input_box.position = @line.position
-      @history.clear_position
+      history.clear_position
     end
 
     #
@@ -628,7 +652,7 @@ module RawLine
     #
     def complete
       @dom.input_box.cursor_off
-      completer = @completion_class.new(
+      completer = completion_class.new(
         char: @char,
         line: @line,
         completion: @completion_proc,
@@ -662,7 +686,7 @@ module RawLine
 
       move_to_position @line.word[:end]
       delete_n_characters(@line.word[:end] - @line.word[:start], true)
-      write completion.to_s + @completion_append_string.to_s
+      write completion.to_s
     end
 
     def completion_not_found
@@ -722,7 +746,7 @@ module RawLine
     def show_history
       pos = @line.position
       text = @line.text
-      @history.each {|l| puts "- [#{l}]"}
+      history.each {|l| puts "- [#{l}]"}
       overwrite_line(text, pos)
     end
 
@@ -730,7 +754,7 @@ module RawLine
     # Clear the editor history.
     #
     def clear_history
-      @history.empty
+      history.empty
     end
 
     #
@@ -757,7 +781,7 @@ module RawLine
     # This action is bound to the up arrow key by default.
     #
     def history_back
-      generic_history_back(@history)
+      generic_history_back(history)
       add_to_line_history
     end
 
@@ -767,7 +791,7 @@ module RawLine
     # This action is bound to down arrow key by default.
     #
     def history_forward
-      generic_history_forward(@history)
+      generic_history_forward(history)
       add_to_line_history
     end
 
@@ -784,7 +808,7 @@ module RawLine
     # Add the current line (<tt>@line.text</tt>) to the editor history.
     #
     def add_to_history
-      @history << @line.text.dup if @add_history && @line.text != ""
+      history << @line.text.dup if @add_history && @line.text != ""
     end
 
     ############################################################################
@@ -839,8 +863,8 @@ module RawLine
     def initialize_line
       @dom.input_box.content = ""
       update_word_separator
-      @add_history = true #add_history
-      @line = Line.new(@line_history_size) do |l|
+      @add_history = true
+      @line = env.initialize_line do |l|
         l.prompt = @dom.prompt_box.content
         l.word_separator = @word_separator
       end
@@ -874,7 +898,7 @@ module RawLine
           raise BindingException, "Unable to bind '#{k.to_s}' (#{k.class.to_s})"
         end
         @terminal.keys[j] = code
-        @keys[code] = block
+        keys[code] = block
       end
     end
 
