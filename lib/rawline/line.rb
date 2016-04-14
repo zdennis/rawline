@@ -144,8 +144,8 @@ module RawLine
     #
     # Add a character (expressed as a character code) to the line text.
     #
-    def <<(char)
-      @text << char.chr
+    def <<(string)
+      @text << string
     end
 
     #

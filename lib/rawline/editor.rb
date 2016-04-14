@@ -361,12 +361,11 @@ module RawLine
 
     #
     # Execute the default action for the last character read via <tt>read</tt>.
-    # By default it prints the character to the screen via <tt>print_character</tt>.
+    # By default it prints the character to the screen via <tt>write</tt>.
     # This method is called automatically by <tt>process_character</tt>.
     #
     def default_action
-      @dom.input_box.content += @char.chr
-      print_character
+      write(@char.chr)
     end
 
     #
@@ -590,30 +589,6 @@ module RawLine
     ############################################################################
 
     #
-    # Write a character to <tt>output</tt> at cursor position,
-    # shifting characters as appropriate.
-    # If <tt>no_line_history</tt> is set to <tt>true</tt>, the updated
-    # won't be saved in the history of the current line.
-    #
-    def print_character(char=@char, no_line_history = false)
-      if @line.position < @line.length then
-        chars = select_characters_from_cursor if @mode == :insert
-        @line.text[@line.position] = (@mode == :insert) ? "#{char.chr}#{@line.text[@line.position]}" : "#{char.chr}"
-        @line.right
-        @dom.input_box.position = @line.position
-        # if @mode == :insert then
-        #   chars.length.times { @line.left } # move cursor back
-        # end
-      else
-        @line.right
-        @line << char
-      end
-      @dom.input_box.content = @line.text
-      @dom.input_box.position = @line.position
-      add_to_line_history unless no_line_history
-    end
-
-    #
     # Write to <tt>output</tt> and then immediately re-render.
     #
     def puts(*args)
@@ -624,13 +599,18 @@ module RawLine
     #
     # Write a string starting from the cursor position.
     #
-    def write(string)
-      @line.text[@line.position] = string
-      string.length.times { @line.right }
+    def write(string, add_to_line_history: true)
+      if @line.position < @line.length
+        @line.text[@line.position] = string
+        string.length.times { @line.right }
+      else
+        @line.right
+        @line << string
+      end
       @dom.input_box.position = @line.position
       @dom.input_box.content = @line.text
 
-      add_to_line_history
+      self.add_to_line_history if add_to_line_history
     end
 
     ############################################################################
@@ -936,7 +916,7 @@ module RawLine
     end
 
     def set_default_keys
-      bind(:space) { print_character(' ') }
+      bind(:space) { write(' ') }
       bind(:enter) { newline }
       bind(:tab) { complete }
       bind(:backspace) { delete_left_character }
