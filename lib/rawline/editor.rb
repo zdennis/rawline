@@ -601,7 +601,7 @@ module RawLine
     #
     def write(string, add_to_line_history: true)
       if @line.position < @line.length
-        @line.text[@line.position] = string
+        @line.text.insert @line.position, string
         string.length.times { @line.right }
       else
         @line.right
