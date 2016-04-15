@@ -210,6 +210,71 @@ describe RawLine::Editor do
     end
   end
 
+  describe "#insert" do
+    before do
+      input << "test #5"
+      input.rewind
+      @editor.event_loop.tick
+      expect(@editor.line.position).to eq(7)
+    end
+
+    it "inserts the given string at the current line position" do
+      @editor.insert "ABC"
+      expect(@editor.line.text).to eq("test #5ABC")
+    end
+
+    it "increments the line position the length of the inserted string" do
+      @editor.insert "ABC"
+      expect(@editor.line.position).to eq(10)
+    end
+
+    it "shifts characters not at the end of the string" do
+      @editor.move_left
+      @editor.insert "931"
+      expect(@editor.line.text).to eq("test #9315")
+      expect(@editor.line.position).to eq(9)
+    end
+
+    it "updates the DOM's input_box and position" do
+      @editor.insert "hello"
+      expect(dom.input_box.content).to eq("test #5hello")
+      expect(dom.input_box.position).to eq(12)
+    end
+  end
+
+  describe "#write" do
+    before do
+      input << "test #5"
+      input.rewind
+      @editor.event_loop.tick
+      expect(@editor.line.position).to eq(7)
+    end
+
+    it "writes the given string at the current line position" do
+      @editor.write "ABC"
+      expect(@editor.line.text).to eq("test #5ABC")
+    end
+
+    it "increments the line position the length of the written string" do
+      @editor.write "ABC"
+      expect(@editor.line.position).to eq(10)
+    end
+
+    it "overwrites any character at the current position" do
+      @editor.move_left
+      @editor.write "931"
+      expect(@editor.line.text).to eq("test #931")
+      expect(@editor.line.position).to eq(9)
+    end
+
+    it "updates the DOM's input_box and position" do
+      @editor.move_left
+      @editor.write "hello"
+      expect(dom.input_box.content).to eq("test #hello")
+      expect(dom.input_box.position).to eq(11)
+    end
+  end
+
   it "can delete characters" do
     input << "test #5"
     input.rewind

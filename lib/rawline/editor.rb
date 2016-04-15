@@ -365,7 +365,7 @@ module RawLine
     # This method is called automatically by <tt>process_character</tt>.
     #
     def default_action
-      write(@char.chr)
+      insert(@char.chr)
     end
 
     #
@@ -597,16 +597,25 @@ module RawLine
     end
 
     #
-    # Write a string starting from the cursor position.
+    # Inserts a string at the current line position, shifting characters
+    # to right if necessary.
+    #
+    def insert(string, add_to_line_history: true)
+      @line.text.insert @line.position, string
+      string.length.times { @line.right }
+      @dom.input_box.position = @line.position
+      @dom.input_box.content = @line.text
+
+      self.add_to_line_history if add_to_line_history
+    end
+
+    #
+    # Write a string starting from the cursor position ovewriting any character
+    # at the current position if necessary.
     #
     def write(string, add_to_line_history: true)
-      if @line.position < @line.length
-        @line.text.insert @line.position, string
-        string.length.times { @line.right }
-      else
-        @line.right
-        @line << string
-      end
+      @line.text[@line.position] = string
+      string.length.times { @line.right }
       @dom.input_box.position = @line.position
       @dom.input_box.content = @line.text
 
@@ -916,7 +925,7 @@ module RawLine
     end
 
     def set_default_keys
-      bind(:space) { write(' ') }
+      bind(:space) { insert(' ') }
       bind(:enter) { newline }
       bind(:tab) { complete }
       bind(:backspace) { delete_left_character }
