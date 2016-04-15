@@ -22,6 +22,10 @@ module RawLine
       @escape_codes = [?\e.ord]
       @keys.merge!(
         {
+          :alt_up_arrow => [?\e.ord, ?\e.ord, ?[.ord, ?A.ord],
+          :alt_down_arrow => [?\e.ord, ?\e.ord, ?[.ord, ?B.ord],
+          :alt_right_arrow => [?\e.ord, ?\e.ord, ?[.ord, ?C.ord],
+          :alt_left_arrow => [?\e.ord, ?\e.ord, ?[.ord, ?D.ord],
           :up_arrow => [?\e.ord, ?[.ord, ?A.ord],
           :down_arrow => [?\e.ord, ?[.ord, ?B.ord],
           :right_arrow => [?\e.ord, ?[.ord, ?C.ord],
