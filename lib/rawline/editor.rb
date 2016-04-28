@@ -237,9 +237,10 @@ module RawLine
     def read_bytes(bytes)
       return unless bytes.any?
       old_position = @line.position
-      key_codes = parse_key_codes(bytes)
-      key_codes.each do |key_code|
-        @char = key_code
+
+      key_code_sequences = parse_key_code_sequences(bytes)
+      key_code_sequences.each do |sequence|
+        @char = sequence
         process_character
 
         new_position = @line.position
@@ -270,11 +271,10 @@ module RawLine
     # This method is called automatically by <tt>read</tt>
     #
     def process_character
-      case @char.class.to_s
-      when 'Fixnum' then
-        default_action
-      when 'Array'
+      if @char.is_a?(Array)
         press_key if key_bound?
+      else
+        default_action
       end
     end
 
@@ -365,14 +365,14 @@ module RawLine
     # This method is called automatically by <tt>process_character</tt>.
     #
     def default_action
-      insert(@char.chr)
+      insert(@char)
     end
 
     #
     # Parse a key or key sequence into the corresponding codes.
     #
-    def parse_key_codes(bytes)
-      KeycodeParser.new(@terminal.keys).parse_bytes(bytes)
+    def parse_key_code_sequences(bytes)
+      KeycodeParser.new(@terminal.keys).parse_bytes_into_sequences(bytes)
     end
 
     #
