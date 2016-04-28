@@ -39,6 +39,7 @@ module RawLine
       @keys =
         {
         :tab => [?\t.ord],
+        :shift_tab => [27, 91, 90],
         :return => [?\r.ord],
         :newline => [?\n.ord],
         :escape => [?\e.ord],
