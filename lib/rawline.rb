@@ -16,10 +16,7 @@ require "rubygems"
 # as the Readline one.
 #
 module RawLine
-
-  def self.rawline_version
-    "0.3.2"
-  end
+  require 'rawline/version'
 
   class BindingException < RuntimeError; end
 

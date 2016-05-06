@@ -161,7 +161,7 @@ module RawLine
     # Return the current RawLine version
     #
     def library_version
-      "RawLine v#{RawLine.rawline_version}"
+      "RawLine v#{RawLine::VERSION}"
     end
 
     def prompt
