@@ -4,22 +4,6 @@ Dir[File.join(File.dirname(__FILE__), 'lib/tasks/**/*.rake')].each {|f| load f }
 
 task :default => :spec
 
-# RSpec
-begin
-  require "rspec/core/rake_task"
-  RSpec::Core::RakeTask.new(:spec) do |t|
-    t.pattern = 'spec/**/*_spec.rb'
-    t.rspec_opts = ["-c", "-f progress"]
-  end
-  RSpec::Core::RakeTask.new(:test) do |t|
-    args = ARGV.reverse
-    args.pop
-    t.pattern = args.join " "
-    t.rspec_opts = ["-c", "-f progress"]
-  end
-rescue LoadError
-  puts "RSpec is not available. Install it with: gem install rspec"
-end
 
 # Yard
 begin
