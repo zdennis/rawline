@@ -152,6 +152,9 @@ module RawLine
     attr_reader :keyboard_input_processors
 
     def env ; @env_stack.last ; end
+    def new_env ; Environment.new ; end
+    def push_env(env) ; @env_stack.push env ; end
+    def pop_env(env) ; @env_stack.pop ; end
 
     def completion_class ; env.completion_class ; end
     def history ; env.history ; end
@@ -651,6 +654,9 @@ module RawLine
         completion_not_found: -> {
           completion_not_found
         },
+        completion_selected: -> (completion) {
+          completion_selected(completion)
+        },
         done: -> (*leftover_bytes){
           completion_done
           leftover_bytes = leftover_bytes.flatten
@@ -667,41 +673,68 @@ module RawLine
     end
 
     def completion_found(completion:, possible_completions:)
+      Treefell['editor'].puts "word-completion-found: #{completion.inspect} possible_completions: #{possible_completions.inspect}"
       if @on_word_complete
         word = @line.word[:text]
         sub_word = @line.text[@line.word[:start]..@line.position-1] || ""
         @on_word_complete.call(name: "word-completion", payload: { sub_word: sub_word, word: word, completion: completion, possible_completions: possible_completions })
       end
 
+      completion_selected(completion)
+    end
+
+    def completion_selected(completion)
+      Treefell['editor'].puts "word-completion-selected #{completion}"
       move_to_position @line.word[:end]
       delete_n_characters(@line.word[:end] - @line.word[:start], true)
       write completion.to_s
+
+      if @on_word_completion_selected
+        Treefell['editor'].puts "word-completion-selected callback called with #{completion}"
+        @on_word_completion_selected.call(name: "word-completion-selected", payload: { completion: completion })
+      end
     end
 
     def completion_not_found
+      Treefell['editor'].puts 'word-completion-not-found'
       if @on_word_complete_no_match
         word = @line.word[:text]
         sub_word = @line.text[@line.word[:start]..@line.position-1] || ""
-        @on_word_complete_no_match.call(name: "word-completion-no-match", payload: { sub_word: sub_word, word: word })
+        payload = { sub_word: sub_word, word: word }
+        Treefell['editor'].puts "word-completion-not-found calling callback with payload: #{payload.inspect}"
+        @on_word_complete_no_match.call(name: "word-completion-no-match", payload: payload)
+      else
+        Treefell['editor'].puts 'word-completion-not-found no on_word_complete_no_match callback to call'
       end
     end
 
     def completion_done
       if @on_word_complete_done
+        Treefell['editor'].puts "word-completion-done calling on_word_complete_done callback"
         @on_word_complete_done.call
+      else
+        Treefell['editor'].puts 'word-completion-done no on_word_complete_done callback to call'
       end
     end
 
     def on_word_complete(&blk)
+      Treefell['editor'].puts "setting on_word_complete callback"
       @on_word_complete = blk
     end
 
     def on_word_complete_no_match(&blk)
+      Treefell['editor'].puts "setting on_word_complete_no_match callback"
       @on_word_complete_no_match = blk
     end
 
     def on_word_complete_done(&blk)
+      Treefell['editor'].puts "setting on_word_complete_done callback"
       @on_word_complete_done = blk
+    end
+
+    def on_word_completion_selected(&blk)
+      Treefell['editor'].puts "setting on_word_completion_selected callback"
+      @on_word_completion_selected = blk
     end
 
     #

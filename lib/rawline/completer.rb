@@ -1,12 +1,13 @@
 module RawLine
 
   class Completer
-    def initialize(char:, line:, completion:, completion_found:, completion_not_found:, done:, keys:)
+    def initialize(char:, line:, completion:, completion_found:, completion_not_found:, completion_selected:, done:, keys:)
       @completion_char = char
       @line = line
       @completion_proc = completion
       @completion_found_proc = completion_found
       @completion_not_found_proc = completion_not_found
+      @completion_selected_proc = completion_selected
       @done_proc = done
       @keys = keys
 
@@ -44,6 +45,7 @@ module RawLine
             .split(/\s+/)
             .delete_if(&:empty?)
           word_index = words.index(word)
+          Treefell['editor'].puts "completer, looking for completions word=#{word.inspect} words=#{words.inspect} word_index=#{word_index}"
           matches = @completion_proc.call(
             word,
             words,
@@ -55,6 +57,14 @@ module RawLine
         if matches.any?
           @completion_matches.resize(matches.length)
           matches.each { |w| @completion_matches << w }
+        end
+
+        if matches.length == 1
+          Treefell['editor'].puts "completer, exactly one possible completion found: #{matches.inspect}"
+          @completion_selected_proc.call(@completion_matches.first)
+          @done_proc.call
+        elsif matches.length > 1
+          Treefell['editor'].puts "completer, more than one possible completion found: #{matches.inspect}"
 
           # Get first match
           @completion_matches.back
@@ -64,6 +74,7 @@ module RawLine
           # a user would expect
           @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
         else
+          Treefell['editor'].puts "completer, no possible completions found"
           @completion_not_found_proc.call
           @done_proc.call
         end
