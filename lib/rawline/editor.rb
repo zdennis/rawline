@@ -735,7 +735,11 @@ module RawLine
     def show_history
       pos = @line.position
       text = @line.text
-      history.each {|l| puts "- [#{l}]"}
+      max_index_width = history.length.to_s.length
+      history.each_with_index do |item, i|
+        @terminal.puts sprintf("%-#{max_index_width}d %s\n", i+1, item)
+      end
+      render(reset: true)
       overwrite_line(text, pos)
     end
 
