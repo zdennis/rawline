@@ -17,8 +17,11 @@ Gem::Specification.new do |s|
   s.files += Dir.glob("examples/*")
   s.files += Dir.glob("spec/*")
   s.files += ["README.rdoc", "LICENSE", "CHANGELOG.rdoc"]
-  s.add_runtime_dependency 'highline', '~> 1.7', '>= 1.7.2'
-  s.add_runtime_dependency("terminal-layout", ["~> 0.3.0"])
-  s.add_runtime_dependency("term-ansicolor", ["~> 1.3.0"])
-  s.add_development_dependency("rspec", ["~> 3.0"])
+
+  s.add_dependency "highline", "~> 1.7", ">= 1.7.2"
+  s.add_dependency "terminal-layout", "~> 0.3.0"
+  s.add_dependency "term-ansicolor", "~> 1.3.0"
+  s.add_dependency "treefell", "~> 0.2.3"
+
+  s.add_development_dependency "rspec", "~> 3.0"
 end
