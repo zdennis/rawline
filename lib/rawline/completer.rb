@@ -39,7 +39,7 @@ module RawLine
       elsif bytes.map(&:ord) != @completion_char
         @done_proc.call(bytes)
       elsif @first_time
-        unless !@completion_proc || @completion_proc == []
+        if @completion_proc && @completion_proc.respond_to?(:call)
           word = @line.text[@line.word[:start]..@line.position-1] || ""
           words = @line.text
             .split(/\s+/)
@@ -52,7 +52,7 @@ module RawLine
             word_index
           )
         end
-        matches = matches.to_a.compact.sort.reverse
+        matches = matches.to_a.compact
 
         if matches.any?
           @completion_matches.resize(matches.length)
