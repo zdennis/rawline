@@ -28,64 +28,107 @@ module RawLine
       # E.g. holding down the tab key or arrow keys
       bytes = bytes.uniq
 
-      if bytes.map(&:ord) == @keys[:left_arrow]
-        @completion_matches.forward
-        match = @completion_matches.get
-        @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
-      elsif bytes.map(&:ord) == @keys[:right_arrow]
-        @completion_matches.back
-        match = @completion_matches.get
-        @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
-      elsif bytes.map(&:ord) != @completion_char
-        @done_proc.call(bytes)
-      elsif @first_time
-        if @completion_proc && @completion_proc.respond_to?(:call)
-          word = @line.text[@line.word[:start]..@line.position-1] || ""
-          words = @line.text
-            .split(/\s+/)
-            .delete_if(&:empty?)
-          word_index = words.index(word)
-          Treefell['editor'].puts "completer, looking for completions word=#{word.inspect} words=#{words.inspect} word_index=#{word_index}"
-          matches = @completion_proc.call(
-            word,
-            words,
-            word_index
-          )
-        end
-        matches = matches.to_a.compact
-
-        if matches.any?
-          @completion_matches.resize(matches.length)
-          matches.each { |w| @completion_matches << w }
-        end
+      if @first_time
+        matches = fetch_completions
+        resize(matches)
 
         if matches.length == 1
-          Treefell['editor'].puts "completer, exactly one possible completion found: #{matches.inspect}"
-          @completion_selected_proc.call(@completion_matches.first)
-          @done_proc.call
+          handle_one_match
         elsif matches.length > 1
-          Treefell['editor'].puts "completer, more than one possible completion found: #{matches.inspect}"
-
-          # Get first match
-          @completion_matches.back
-          match = @completion_matches.get
-
-          # completion matches is a history implementation and its in reverse order from what
-          # a user would expect
-          @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
+          handle_more_than_one_match
         else
-          Treefell['editor'].puts "completer, no possible completions found"
-          @completion_not_found_proc.call
-          @done_proc.call
+          handle_no_completions
         end
-        @first_time = false
-      else
-        @completion_matches.back
-        match = @completion_matches.get
 
-        @completion_found_proc.call(completion: match, possible_completions: @completion_matches.reverse)
+        @first_time = false
+      elsif bytes.map(&:ord) == @keys[:left_arrow]
+        select_previous
+      elsif bytes.map(&:ord) == @keys[:right_arrow]
+        select_next
+      elsif bytes.map(&:ord) == @completion_char
+        select_next
+      else
+        Treefell['editor'].puts "completer, done with leftover bytes: #{bytes.inspect}"
+        @done_proc.call(bytes)
       end
     end
-  end
 
+    private
+
+    def fetch_completions
+      if @completion_proc && @completion_proc.respond_to?(:call)
+        word = @line.text[@line.word[:start]..@line.position-1] || ""
+        words = @line.text
+          .split(/\s+/)
+          .delete_if(&:empty?)
+        word_index = words.index(word)
+        Treefell['editor'].puts "completer, looking for completions word=#{word.inspect} words=#{words.inspect} word_index=#{word_index}"
+        matches = @completion_proc.call(
+          word,
+          words,
+          word_index
+        )
+      end
+
+      # Always return an array so the caller doesn't have
+      # to worry about nil
+      matches.to_a.compact
+    end
+
+    def handle_one_match
+      Treefell['editor'].puts "completer, exactly one possible completion found: #{matches.inspect}"
+      @completion_selected_proc.call(@completion_matches.first)
+
+      Treefell['editor'].puts "completer, done"
+      @done_proc.call
+    end
+
+    def handle_more_than_one_match
+      Treefell['editor'].puts "completer, more than one possible completion"
+
+      # Get first match
+      @completion_matches.back
+      match = @completion_matches.get
+
+      Treefell['editor'].puts "completer: first completion: #{match} possible: #{possible_completions.inspect}"
+      @completion_found_proc.call(completion: match, possible_completions: possible_completions)
+    end
+
+    def handle_no_completions
+      Treefell['editor'].puts "completer, no possible completions found"
+      @completion_not_found_proc.call
+
+      Treefell['editor'].puts "completer, done"
+      @done_proc.call
+    end
+
+    def possible_completions
+      # completion matches is a history implementation and its in reverse order from what
+      # a user would expect
+      @completion_matches.reverse
+    end
+
+    def resize(matches)
+      if matches.any?
+        @completion_matches.resize(matches.length)
+        matches.each { |w| @completion_matches << w }
+      end
+    end
+
+    def select_next
+      @completion_matches.back
+      match = @completion_matches.get
+
+      Treefell['editor'].puts "completer, selecting next match=#{match.inspect} possible_completions=#{possible_completions.inspect}"
+      @completion_found_proc.call(completion: match, possible_completions: possible_completions)
+    end
+
+    def select_previous
+      @completion_matches.forward
+      match = @completion_matches.get
+
+      Treefell['editor'].puts "completer, selecting previous match=#{match.inspect} possible_completions=#{possible_completions.inspect}"
+      @completion_found_proc.call(completion: match, possible_completions: possible_completions)
+    end
+  end
 end
