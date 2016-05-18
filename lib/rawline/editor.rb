@@ -684,13 +684,13 @@ module RawLine
     end
 
     def completion_selected(completion)
-      Treefell['editor'].puts "word-completion-selected #{completion}"
+      Treefell['editor'].puts "word-completion-selected #{completion.inspect}"
       move_to_position @line.word[:end]
       delete_n_characters(@line.word[:end] - @line.word[:start], true)
       write completion.to_s
 
       if @on_word_completion_selected
-        Treefell['editor'].puts "word-completion-selected callback called with #{completion}"
+        Treefell['editor'].puts "word-completion-selected callback called with #{completioni}"
         @on_word_completion_selected.call(name: "word-completion-selected", payload: { completion: completion })
       end
     end
@@ -871,10 +871,12 @@ module RawLine
       @event_loop = Rawline::EventLoop.new(registry: @event_registry)
 
       @dom.on(:child_changed) do |*args|
+        Treefell['editor'].puts 'DOM child changed, re-rendering'
         @event_loop.add_event name: "render", source: @dom#, target: event[:target]
       end
 
       @dom.on :position_changed do |*args|
+        Treefell['editor'].puts 'DOM position changed, rendering cursor'
         @renderer.render_cursor(@dom.input_box)
       end
 
