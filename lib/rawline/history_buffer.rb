@@ -136,7 +136,7 @@ module RawLine
 
       case @position
       when nil then
-        nil
+        @position = 0
       when length-1 then
         @position = 0 if @cycle
       else

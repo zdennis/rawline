@@ -87,11 +87,11 @@ module RawLine
       Treefell['editor'].puts "completer, more than one possible completion"
 
       # Get first match
-      @completion_matches.back
+      @completion_matches.forward
       match = @completion_matches.get
 
-      Treefell['editor'].puts "completer: first completion: #{match} possible: #{possible_completions.inspect}"
-      @completion_found_proc.call(completion: match, possible_completions: possible_completions)
+      Treefell['editor'].puts "completer: first completion: #{match} possible: #{@completion_matches.inspect}"
+      @completion_found_proc.call(completion: match, possible_completions: @completion_matches)
     end
 
     def handle_no_completions
@@ -102,12 +102,6 @@ module RawLine
       @done_proc.call
     end
 
-    def possible_completions
-      # completion matches is a history implementation and its in reverse order from what
-      # a user would expect
-      @completion_matches.reverse
-    end
-
     def resize(matches)
       if matches.any?
         @completion_matches.resize(matches.length)
@@ -116,19 +110,19 @@ module RawLine
     end
 
     def select_next
-      @completion_matches.back
-      match = @completion_matches.get
-
-      Treefell['editor'].puts "completer, selecting next match=#{match.inspect} possible_completions=#{possible_completions.inspect}"
-      @completion_found_proc.call(completion: match, possible_completions: possible_completions)
-    end
-
-    def select_previous
       @completion_matches.forward
       match = @completion_matches.get
 
-      Treefell['editor'].puts "completer, selecting previous match=#{match.inspect} possible_completions=#{possible_completions.inspect}"
-      @completion_found_proc.call(completion: match, possible_completions: possible_completions)
+      Treefell['editor'].puts "completer, selecting next match=#{match.inspect} possible_completions=#{@completion_matches.inspect}"
+      @completion_found_proc.call(completion: match, possible_completions: @completion_matches)
+    end
+
+    def select_previous
+      @completion_matches.back
+      match = @completion_matches.get
+
+      Treefell['editor'].puts "completer, selecting previous match=#{match.inspect} possible_completions=#{@completion_matches.inspect}"
+      @completion_found_proc.call(completion: match, possible_completions: @completion_matches)
     end
   end
 end
