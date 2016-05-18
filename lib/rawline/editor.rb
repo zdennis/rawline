@@ -174,10 +174,12 @@ module RawLine
     def prompt=(text)
       return if @line && @line.prompt == text
       @prompt = Prompt.new(text)
+      Treefell['editor'].puts "prompt=#{prompt.inspect}"
       @dom.prompt_box.content = @prompt
     end
 
     def redraw_prompt
+      Treefell['editor'].puts "redrawing prompt=#{prompt.inspect} reset=true"
       render(reset: true)
     end
 
@@ -201,11 +203,14 @@ module RawLine
       at_exit { @terminal.cooked! }
 
       Signal.trap("SIGWINCH") do
+        Treefell['editor'].puts "terminal-resized trap=SIGWINCH"
         @event_loop.add_event name: "terminal-resized", source: self
       end
 
       @event_registry.subscribe("terminal-resized") do
-        @renderer.update_dimensions(width: terminal_width, height: terminal_height)
+        width, height = terminal_width, terminal_height
+        Treefell['editor'].puts "terminal-resizing width=#{width} height=#{height}"
+        @renderer.update_dimensions(width: width, height: height)
         @event_loop.add_event name: "render", source: self
       end
 
