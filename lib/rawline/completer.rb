@@ -76,7 +76,7 @@ module RawLine
     end
 
     def handle_one_match
-      Treefell['editor'].puts "completer, exactly one possible completion found: #{matches.inspect}"
+      Treefell['editor'].puts "completer, exactly one possible completion found: #{@completion_matches.inspect}"
       @completion_selected_proc.call(@completion_matches.first)
 
       Treefell['editor'].puts "completer, done"
