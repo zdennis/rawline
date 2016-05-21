@@ -26,6 +26,7 @@ module RawLine
     def delete_left_character
       if move_left then
         delete_character
+        sync!
         return true
       end
       false
