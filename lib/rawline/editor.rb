@@ -375,12 +375,14 @@ module RawLine
     # This action is bound to ctrl+k by default.
     #
     def clear_line
+      Treefell['editor'].puts "clear_line"
       add_to_line_history
       @line_editor.clear_line
       history.clear_position
     end
 
     def clear_screen
+      Treefell['editor'].puts "clear_screen"
       @terminal.clear_screen
       render(reset: true)
     end
@@ -392,6 +394,7 @@ module RawLine
     # This action is bound to the backspace key by default.
     #
     def delete_left_character(no_line_history=false)
+      Treefell['editor'].puts "delete_left_character"
       if @line_editor.delete_left_character
         add_to_line_history unless no_line_history
         history.clear_position
@@ -399,6 +402,7 @@ module RawLine
     end
 
     def delete_n_characters(number_of_characters_to_delete, no_line_history=false)
+      Treefell['editor'].puts "delete_n_characters n=#{number_of_characters_to_delete}"
       if @line_editor.delete_n_characters
         add_to_line_history unless no_line_history
         history.clear_position
@@ -412,6 +416,7 @@ module RawLine
     # This action is bound to the delete key by default.
     #
     def delete_character(no_line_history=false)
+      Treefell['editor'].puts "delete_character"
       if @line_editor.delete_character
         add_to_line_history unless no_line_history
         history.clear_position
@@ -419,6 +424,7 @@ module RawLine
     end
 
     def highlight_text_up_to(text, position)
+      Treefell['editor'].puts "highlight_text_up_to text=#{text} position=#{position}"
       @line_editor.highlight_text_up_to(text, position)
     end
 
@@ -466,6 +472,7 @@ module RawLine
     # This action is bound to the left arrow key by default.
     #
     def move_left
+      Treefell['editor'].puts "move_left"
       @line_editor.move_left
     end
 
@@ -476,14 +483,17 @@ module RawLine
     # This action is bound to the right arrow key by default.
     #
     def move_right
+      Treefell['editor'].puts "move_right"
       @line_editor.move_right
     end
 
     def move_to_beginning_of_input
+      Treefell['editor'].puts "move_to_beginning_of_input"
       @line_editor.move_to_beginning_of_input
     end
 
     def move_to_end_of_input
+      Treefell['editor'].puts "move_to_end_of_input"
       @line_editor.move_to_end_of_input
     end
 
@@ -491,6 +501,7 @@ module RawLine
     # Move the cursor to <tt>pos</tt>.
     #
     def move_to_position(pos)
+      Treefell['editor'].puts "move_to_position position=#{pos}"
       rows_to_move = current_terminal_row - terminal_row_for_line_position(pos)
       if rows_to_move > 0
         # rows_to_move.times { @output.print @terminal.term_info.control_string("cuu1") }
@@ -511,12 +522,14 @@ module RawLine
     # <tt>position</tt>.
     #
     def overwrite_line(new_line, position=nil, options={})
+      Treefell['editor'].puts "overwrite_line new_line=#{new_line} position=#{position} options=#{options.inspect}"
       if @line_editor.overwrite_line(new_line, position, options)
         @event_loop.add_event name: "render", source: focused_input_box
       end
     end
 
     def reset_line
+      Treefell['editor'].puts "reset_line"
       initialize_line
       render(reset: true)
     end
