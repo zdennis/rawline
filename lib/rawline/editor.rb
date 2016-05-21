@@ -76,6 +76,8 @@ module RawLine
         height: terminal.height
       )
 
+      KeyBindings.default_terminal = terminal
+
       new(
         dom: dom,
         input: NonBlockingInput.new(input),
@@ -87,13 +89,15 @@ module RawLine
 
     class Environment
       attr_accessor :keys, :completion_class, :history, :word_separator
+      attr_accessor :keyboard_input_processors
 
       # * <tt>@history_size</tt> - the size of the editor history buffer (30).
       # * <tt>@keys</tt> - the keys (arrays of character codes) bound to specific actions.
       # * <tt>@line_history_size</tt> - the size of the editor line history buffer (50).
       def initialize(env: nil)
         @env = env
-        @keys = {}
+        @keys = KeyBindings.new
+        @keyboard_input_processors = []
 
         @completion_class = Completer
 
@@ -139,7 +143,7 @@ module RawLine
       @match_hidden_files = false
       set_default_keys
       @add_history = false
-      @keyboard_input_processors = [self]
+      push_keyboard_input_processor self
       yield self if block_given?
       update_word_separator
       @char = nil
@@ -154,11 +158,14 @@ module RawLine
     def env ; @env_stack.last ; end
     def new_env ; Environment.new ; end
     def push_env(env) ; @env_stack.push env ; end
-    def pop_env(env) ; @env_stack.pop ; end
+    def pop_env ; @env_stack.pop ; end
+    def keyboard_input_processor ; env.keyboard_input_processors.last ; end
+    def push_keyboard_input_processor(kip) ; env.keyboard_input_processors.push kip ; end
+    def pop_keyboard_input_processor ; env.keyboard_input_processors.pop ; end
 
-    def completion_class ; env.completion_class ; end
-    def history ; env.history ; end
-    def keys ; env.keys ; end
+    def completion_class ; @env_stack.first.completion_class ; end
+    def history ; @env_stack.first.history ; end
+    def keys ; @env_stack.first.keys ; end
 
     #
     # Return the current RawLine version
@@ -237,7 +244,7 @@ module RawLine
     def check_for_keyboard_input
       bytes = @input.read
       if bytes.any?
-        @keyboard_input_processors.last.read_bytes(bytes)
+        keyboard_input_processor.read_bytes(bytes)
       end
       @event_loop.add_event name: 'check_for_keyboard_input', source: self
     end
@@ -304,59 +311,18 @@ module RawLine
     # * The value can be a Fixnum, a String or an Array.
     #
     def bind(key, &block)
-      case key.class.to_s
-      when 'Symbol' then
-        raise BindingException, "Unknown key or key sequence '#{key.to_s}' (#{key.class.to_s})" unless @terminal.keys[key]
-        keys[@terminal.keys[key]] = block
-      when 'Array' then
-        raise BindingException, "Unknown key or key sequence '#{key.join(", ")}' (#{key.class.to_s})" unless @terminal.keys.has_value? key
-        keys[key] = block
-      when 'Fixnum' then
-        raise BindingException, "Unknown key or key sequence '#{key.to_s}' (#{key.class.to_s})" unless @terminal.keys.has_value? [key]
-        keys[[key]] = block
-      when 'String' then
-        if key.length == 1 then
-          keys[[key.ord]] = block
-        else
-          bind_hash({:"#{key}" => key}, block)
-        end
-      when 'Hash' then
-        raise BindingException, "Cannot bind more than one key or key sequence at once" unless key.values.length == 1
-        bind_hash(key, block)
-      else
-        raise BindingException, "Unable to bind '#{key.to_s}' (#{key.class.to_s})"
-      end
-      @terminal.update
+      keys.bind(key, &block)
     end
 
     def unbind(key)
-      block = case key.class.to_s
-        when 'Symbol' then
-          keys.delete @terminal.keys[key]
-        when 'Array' then
-          keys.delete keys[key]
-        when 'Fixnum' then
-          keys.delete[[key]]
-        when 'String' then
-          if key.length == 1 then
-            keys.delete([key.ord])
-          else
-            raise NotImplementedError, "This is no implemented yet. It needs to return the previously bound block"
-            bind_hash({:"#{key}" => key}, block)
-          end
-        when 'Hash' then
-          raise BindingException, "Cannot bind more than one key or key sequence at once" unless key.values.length == 1
-          bind_hash(key, -> { })
-        end
-      @terminal.update
-      block
+      keys.unbind(key)
     end
 
     #
     # Return true if the last character read via <tt>read</tt> is bound to an action.
     #
     def key_bound?
-      keys[@char] ? true : false
+      keys.bound?(@char)
     end
 
     #
@@ -665,15 +631,15 @@ module RawLine
         done: -> (*leftover_bytes){
           completion_done
           leftover_bytes = leftover_bytes.flatten
-          @keyboard_input_processors.pop
+          pop_keyboard_input_processor
           if leftover_bytes.any?
-            @keyboard_input_processors.last.read_bytes(leftover_bytes)
+            keyboard_input_processor.read_bytes(leftover_bytes)
           end
           @dom.input_box.cursor_on
         },
         keys: terminal.keys
       )
-      @keyboard_input_processors.push(completer)
+      push_keyboard_input_processor(completer)
       completer.read_bytes(@char)
     end
 
@@ -914,25 +880,6 @@ module RawLine
         chars << value
       end
       @word_separator = /(?<!\\)[#{chars.join}]/
-    end
-
-    def bind_hash(key, block)
-      key.each_pair do |j,k|
-        raise BindingException, "'#{k[0].chr}' is not a legal escape code for '#{@terminal.class.to_s}'." unless k.length > 1 && @terminal.escape_codes.include?(k[0].ord)
-        code = []
-        case k.class.to_s
-        when 'Fixnum' then
-          code = [k]
-        when 'String' then
-          k.each_byte { |b| code << b }
-        when 'Array' then
-          code = k
-        else
-          raise BindingException, "Unable to bind '#{k.to_s}' (#{k.class.to_s})"
-        end
-        @terminal.keys[j] = code
-        keys[code] = block
-      end
     end
 
     def select_characters_from_cursor(offset=0)
