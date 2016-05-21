@@ -17,8 +17,8 @@ module RawLine
       @renderer.render(@render_tree, reset: reset)
     end
 
-    def render_cursor(input_box)
-      @renderer.render_cursor(input_box)
+    def render_cursor
+      @renderer.render_cursor(@dom.focused_input_box)
     end
 
     def update_dimensions(width:, height:)

@@ -49,7 +49,7 @@ module RawLine
     attr_accessor :dom
 
     # TODO: dom traversal for lookup rather than assignment
-    attr_accessor :prompt_box, :input_box, :content_box
+    attr_accessor :prompt_box, :input_box, :content_box, :focused_input_box
 
     def self.create(dom: nil, &blk)
       terminal = nil
@@ -194,6 +194,7 @@ module RawLine
     def terminal_height ; @terminal.height ; end
 
     def content_box ; @dom.content_box ; end
+    def focused_input_box ; @dom.focused_input_box ; end
     def input_box ; @dom.input_box ; end
     def prompt_box ; @dom.prompt_box ; end
 
@@ -377,7 +378,7 @@ module RawLine
       add_to_line_history
       @line.text = ""
       @line.position = 0
-      @dom.input_box.position = @line.position
+      focused_input_box.position = @line.position
       history.clear_position
     end
 
@@ -404,8 +405,8 @@ module RawLine
         @line.left
       end
 
-      @dom.input_box.position = @line.position
-      @dom.input_box.content = @line.text
+      focused_input_box.position = @line.position
+      focused_input_box.content = @line.text
       add_to_line_history unless no_line_history
       history.clear_position
     end
@@ -422,8 +423,8 @@ module RawLine
         chars = (@line.eol?) ? ' ' : select_characters_from_cursor(1)
         #remove character from line
         @line[@line.position] = ''
-        @dom.input_box.content = @line.text
-        @dom.input_box.position = @line.position
+        focused_input_box.content = @line.text
+        focused_input_box.position = @line.position
         add_to_line_history unless no_line_history
         history.clear_position
       end
@@ -436,8 +437,8 @@ module RawLine
     def kill_forward
       killed_text = @line.text[@line.position..-1]
       @line.text[@line.position..-1] = ANSIString.new("")
-      @dom.input_box.content = line.text
-      @dom.input_box.position = @line.position
+      focused_input_box.content = line.text
+      focused_input_box.position = @line.position
       history.clear_position
       killed_text
     end
@@ -445,8 +446,8 @@ module RawLine
     def yank_forward(text)
       @line.text[line.position] = text
       @line.position = line.position + text.length
-      @dom.input_box.content = line.text
-      @dom.input_box.position = @line.position
+      focused_input_box.content = line.text
+      focused_input_box.position = @line.position
       history.clear_position
     end
 
@@ -458,7 +459,7 @@ module RawLine
     def move_left
       unless @line.bol? then
         @line.left
-        @dom.input_box.position = @line.position
+        focused_input_box.position = @line.position
         return true
       end
       false
@@ -473,7 +474,7 @@ module RawLine
     def move_right
       unless @line.position > @line.eol then
         @line.right
-        @dom.input_box.position = @line.position
+        focused_input_box.position = @line.position
         return true
       end
       false
@@ -481,12 +482,12 @@ module RawLine
 
     def move_to_beginning_of_input
       @line.position = @line.bol
-      @dom.input_box.position = @line.position
+      focused_input_box.position = @line.position
     end
 
     def move_to_end_of_input
       @line.position = @line.length
-      @dom.input_box.position = @line.position
+      focused_input_box.position = @line.position
     end
 
     #
@@ -505,7 +506,7 @@ module RawLine
       # @output.print @terminal.term_info.control_string("hpa", column)
       # @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
       @line.position = pos
-      @dom.input_box.position = @line.position
+      focused_input_box.position = @line.position
     end
 
     def move_to_end_of_line
@@ -513,7 +514,7 @@ module RawLine
       # rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
       # @terminal.move_down_n_rows rows_to_move_down
       @line.position = @line.length
-      @dom.input_box.position = @line.position
+      focused_input_box.position = @line.position
 
       column = (@line.prompt.length + @line.position) % terminal_width
       # @output.print @terminal.term_info.control_string("hpa", column)
@@ -536,9 +537,9 @@ module RawLine
 
       @line.position = position || new_line.length
       @line.text = new_line
-      @dom.input_box.content = @line.text
-      @dom.input_box.position = @line.position
-      @event_loop.add_event name: "render", source: @dom.input_box
+      focused_input_box.content = @line.text
+      focused_input_box.position = @line.position
+      @event_loop.add_event name: "render", source: focused_input_box
     end
 
     def reset_line
@@ -577,8 +578,8 @@ module RawLine
     def insert(string, add_to_line_history: true)
       @line.text.insert @line.position, string
       string.length.times { @line.right }
-      @dom.input_box.position = @line.position
-      @dom.input_box.content = @line.text
+      focused_input_box.position = @line.position
+      focused_input_box.content = @line.text
 
       self.add_to_line_history if add_to_line_history
     end
@@ -590,8 +591,8 @@ module RawLine
     def write(string, add_to_line_history: true)
       @line.text[@line.position] = string
       string.length.times { @line.right }
-      @dom.input_box.position = @line.position
-      @dom.input_box.content = @line.text
+      focused_input_box.position = @line.position
+      focused_input_box.content = @line.text
 
       self.add_to_line_history if add_to_line_history
     end
@@ -614,7 +615,7 @@ module RawLine
     # pressed again.
     #
     def complete
-      @dom.input_box.cursor_off
+      focused_input_box.cursor_off
       completer = completion_class.new(
         char: @char,
         line: @line,
@@ -635,7 +636,7 @@ module RawLine
           if leftover_bytes.any?
             keyboard_input_processor.read_bytes(leftover_bytes)
           end
-          @dom.input_box.cursor_on
+          focused_input_box.cursor_on
         },
         keys: terminal.keys
       )
@@ -832,6 +833,11 @@ module RawLine
       overwrite_line(text, pos)
     end
 
+    def focus_input_box(box)
+      @dom.focus_input_box(box)
+      @renderer.render_cursor
+    end
+
     private
 
     def initialize_events
@@ -848,8 +854,13 @@ module RawLine
 
       @dom.on :position_changed do |*args|
         Treefell['editor'].puts 'DOM position changed, rendering cursor'
-        @renderer.render_cursor(@dom.input_box)
+        @renderer.render
       end
+
+      # @dom.on :focus_changed do |*args|
+      #   Treefell['editor'].puts 'DOM position changed, rendering cursor'
+      #   @renderer.render
+      # end
 
       @event_registry.subscribe :render, -> (_) { render(reset: false) }
     end
@@ -860,7 +871,7 @@ module RawLine
     end
 
     def initialize_line
-      @dom.input_box.content = ""
+      focused_input_box.content = ""
       update_word_separator
       @add_history = true
       @line = env.initialize_line do |l|
