@@ -164,6 +164,10 @@ module RawLine
       sync!
     end
 
+    def text
+      @line.text
+    end
+
     private
 
     def select_characters_from_cursor(offset=0)
