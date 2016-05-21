@@ -479,18 +479,6 @@ module RawLine
       @line_editor.position = pos
     end
 
-    # UNUSED?
-    def move_to_end_of_line
-      rows_to_move_down = number_of_terminal_rows - current_terminal_row
-      # rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
-      # @terminal.move_down_n_rows rows_to_move_down
-      @line_editor.move_to_end_of_input
-
-      column = (@line.prompt.length + @line.position) % terminal_width
-      # @output.print @terminal.term_info.control_string("hpa", column)
-      # @terminal.move_to_column((@line.prompt.length + @line.position) % terminal_width)
-    end
-
     #
     # Overwrite the current line (<tt>@line.text</tt>)
     # with <tt>new_line</tt>, and optionally reset the cursor position to
