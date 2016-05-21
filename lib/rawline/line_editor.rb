@@ -62,11 +62,38 @@ module RawLine
       ANSIString.new("\e[1m#{text[0...position]}\e[0m#{text[position..-1]}")
     end
 
+    #
+    # Inserts a string at the current line position, shifting characters
+    # to right if necessary.
+    #
+    def insert(string)
+      return false if string.empty?
+      @line.text.insert @line.position, string
+      string.length.times { @line.right }
+      sync!
+      true
+    end
+
     def kill_forward
       @line.text[@line.position..-1].tap do
         @line.text[@line.position..-1] = ANSIString.new("")
         sync!
       end
+    end
+
+    #
+    # Write a string starting from the cursor position ovewriting any character
+    # at the current position if necessary.
+    #
+    def write(string)
+      if @line.eol?
+        @line.text[@line.position] = string
+      else
+        @line.text << string
+      end
+      string.length.times { @line.right }
+      sync!
+      true
     end
 
     def yank_forward(text)

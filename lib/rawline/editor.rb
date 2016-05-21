@@ -422,11 +422,33 @@ module RawLine
       @line_editor.highlight_text_up_to(text, position)
     end
 
+    #
+    # Inserts a string at the current line position, shifting characters
+    # to right if necessary.
+    #
+    def insert(string, add_to_line_history: true)
+      Treefell['editor'].puts "insert string=#{string} add_to_line_history=#{add_to_line_history}"
+      if @line_editor.insert(string)
+        self.add_to_line_history if add_to_line_history
+      end
+    end
+
     def kill_forward
       Treefell['editor'].puts "kill_forward"
       @line_editor.kill_forward.tap do
         add_to_line_history(allow_empty: true)
         history.clear_position
+      end
+    end
+
+    #
+    # Write a string starting from the cursor position ovewriting any character
+    # at the current position if necessary.
+    #
+    def write(string, add_to_line_history: true)
+      Treefell['editor'].puts "write string=#{string}"
+      if @line_editor.write(string)
+        self.add_to_line_history if add_to_line_history
       end
     end
 
@@ -521,35 +543,6 @@ module RawLine
     def puts(*args)
       @terminal.puts(*args)
       render(reset: true)
-    end
-
-    #
-    # Inserts a string at the current line position, shifting characters
-    # to right if necessary.
-    #
-    def insert(string, add_to_line_history: true)
-      return if string.empty?
-
-      Treefell['editor'].puts "insert string=#{string} add_to_line_history=#{add_to_line_history}"
-      @line.text.insert @line.position, string
-      string.length.times { @line.right }
-      focused_input_box.position = @line.position
-      focused_input_box.content = @line.text
-
-      self.add_to_line_history if add_to_line_history
-    end
-
-    #
-    # Write a string starting from the cursor position ovewriting any character
-    # at the current position if necessary.
-    #
-    def write(string, add_to_line_history: true)
-      @line.text[@line.position] = string
-      string.length.times { @line.right }
-      focused_input_box.position = @line.position
-      focused_input_box.content = @line.text
-
-      self.add_to_line_history if add_to_line_history
     end
 
     ############################################################################
