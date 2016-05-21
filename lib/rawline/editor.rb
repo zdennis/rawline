@@ -376,9 +376,7 @@ module RawLine
     #
     def clear_line
       add_to_line_history
-      @line.text = ""
-      @line.position = 0
-      focused_input_box.position = @line.position
+      @line_editor.clear_line
       history.clear_position
     end
 
@@ -394,21 +392,17 @@ module RawLine
     # This action is bound to the backspace key by default.
     #
     def delete_left_character(no_line_history=false)
-      if move_left then
-        delete_character(no_line_history)
+      if @line_editor.delete_left_character
+        add_to_line_history unless no_line_history
+        history.clear_position
       end
     end
 
     def delete_n_characters(number_of_characters_to_delete, no_line_history=false)
-      number_of_characters_to_delete.times do |n|
-        @line[@line.position] = ''
-        @line.left
+      if @line_editor.delete_n_characters
+        add_to_line_history unless no_line_history
+        history.clear_position
       end
-
-      focused_input_box.position = @line.position
-      focused_input_box.content = @line.text
-      add_to_line_history unless no_line_history
-      history.clear_position
     end
 
     #
@@ -418,37 +412,26 @@ module RawLine
     # This action is bound to the delete key by default.
     #
     def delete_character(no_line_history=false)
-      unless @line.position > @line.eol
-        # save characters to shift
-        chars = (@line.eol?) ? ' ' : select_characters_from_cursor(1)
-        #remove character from line
-        @line[@line.position] = ''
-        focused_input_box.content = @line.text
-        focused_input_box.position = @line.position
+      if @line_editor.delete_character
         add_to_line_history unless no_line_history
         history.clear_position
       end
     end
 
     def highlight_text_up_to(text, position)
-      ANSIString.new("\e[1m#{text[0...position]}\e[0m#{text[position..-1]}")
+      @line_editor.highlight_text_up_to(text, position)
     end
 
     def kill_forward
-      killed_text = @line.text[@line.position..-1]
-      @line.text[@line.position..-1] = ANSIString.new("")
-      focused_input_box.content = line.text
-      focused_input_box.position = @line.position
-      history.clear_position
-      killed_text
+      @line_editor.kill_forward.tap do
+        history.clear_position
+      end
     end
 
     def yank_forward(text)
-      @line.text[line.position] = text
-      @line.position = line.position + text.length
-      focused_input_box.content = line.text
-      focused_input_box.position = @line.position
-      history.clear_position
+      @line_editor.yank_forward(text).tap do |result|
+        history.clear_position
+      end
     end
 
     #
@@ -457,12 +440,7 @@ module RawLine
     # This action is bound to the left arrow key by default.
     #
     def move_left
-      unless @line.bol? then
-        @line.left
-        focused_input_box.position = @line.position
-        return true
-      end
-      false
+      @line_editor.move_left
     end
 
     #
@@ -472,22 +450,15 @@ module RawLine
     # This action is bound to the right arrow key by default.
     #
     def move_right
-      unless @line.position > @line.eol then
-        @line.right
-        focused_input_box.position = @line.position
-        return true
-      end
-      false
+      @line_editor.move_right
     end
 
     def move_to_beginning_of_input
-      @line.position = @line.bol
-      focused_input_box.position = @line.position
+      @line_editor.move_to_beginning_of_input
     end
 
     def move_to_end_of_input
-      @line.position = @line.length
-      focused_input_box.position = @line.position
+      @line_editor.move_to_end_of_input
     end
 
     #
@@ -505,16 +476,15 @@ module RawLine
       column = (@line.prompt.length + pos) % terminal_width
       # @output.print @terminal.term_info.control_string("hpa", column)
       # @terminal.move_to_column((@line.prompt.length + pos) % terminal_width)
-      @line.position = pos
-      focused_input_box.position = @line.position
+      @line_editor.position = pos
     end
 
+    # UNUSED?
     def move_to_end_of_line
       rows_to_move_down = number_of_terminal_rows - current_terminal_row
       # rows_to_move_down.times { @output.print @terminal.term_info.control_string("cud1") }
       # @terminal.move_down_n_rows rows_to_move_down
-      @line.position = @line.length
-      focused_input_box.position = @line.position
+      @line_editor.move_to_end_of_input
 
       column = (@line.prompt.length + @line.position) % terminal_width
       # @output.print @terminal.term_info.control_string("hpa", column)
@@ -527,19 +497,10 @@ module RawLine
     # <tt>position</tt>.
     #
     def overwrite_line(new_line, position=nil, options={})
-      text = @line.text
-      @highlighting = false
-
-      if options[:highlight_up_to]
-        @highlighting = true
-        new_line = highlight_text_up_to(new_line, options[:highlight_up_to])
+      if @line_editor.overwrite_line(new_line, position, options)
+        add_to_line_history
+        @event_loop.add_event name: "render", source: focused_input_box
       end
-
-      @line.position = position || new_line.length
-      @line.text = new_line
-      focused_input_box.content = @line.text
-      focused_input_box.position = @line.position
-      @event_loop.add_event name: "render", source: focused_input_box
     end
 
     def reset_line
@@ -878,6 +839,10 @@ module RawLine
         l.prompt = @dom.prompt_box.content
         l.word_separator = @word_separator
       end
+      @line_editor = LineEditor.new(
+        @line,
+        sync_with: -> { focused_input_box }
+      )
       add_to_line_history
       @allow_prompt_updates = true
     end
@@ -891,10 +856,6 @@ module RawLine
         chars << value
       end
       @word_separator = /(?<!\\)[#{chars.join}]/
-    end
-
-    def select_characters_from_cursor(offset=0)
-      select_characters(:right, @line.length-@line.position, offset)
     end
 
     def generic_history_back(history)
@@ -915,14 +876,6 @@ module RawLine
 
         cursor_position = nil
         overwrite_line(line, cursor_position, highlight_up_to: cursor_position)
-      end
-    end
-
-    def select_characters(direction, n, offset=0)
-      if direction == :right then
-        @line.text[@line.position+offset..@line.position+offset+n]
-      elsif direction == :left then
-        @line.text[@line.position-offset-n..@line.position-offset]
       end
     end
 
