@@ -32,7 +32,7 @@ module RawLine
     # * <tt>@position</tt> - the current cursor position within the line.
     # * <tt>@prompt</tt> - a prompt to prepend to the line text.
     #
-    def initialize(history_size)
+    def initialize(history_size=30)
       @text = ANSIString.new("")
       @history_size = history_size
       @position = 0
