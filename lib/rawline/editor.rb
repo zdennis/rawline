@@ -423,13 +423,17 @@ module RawLine
     end
 
     def kill_forward
+      Treefell['editor'].puts "kill_forward"
       @line_editor.kill_forward.tap do
+        add_to_line_history(allow_empty: true)
         history.clear_position
       end
     end
 
     def yank_forward(text)
-      @line_editor.yank_forward(text).tap do |result|
+      Treefell['editor'].puts "yank_forward"
+      @line_editor.yank_forward(text).tap do
+        add_to_line_history
         history.clear_position
       end
     end
@@ -486,7 +490,6 @@ module RawLine
     #
     def overwrite_line(new_line, position=nil, options={})
       if @line_editor.overwrite_line(new_line, position, options)
-        add_to_line_history
         @event_loop.add_event name: "render", source: focused_input_box
       end
     end
@@ -525,6 +528,9 @@ module RawLine
     # to right if necessary.
     #
     def insert(string, add_to_line_history: true)
+      return if string.empty?
+
+      Treefell['editor'].puts "insert string=#{string} add_to_line_history=#{add_to_line_history}"
       @line.text.insert @line.position, string
       string.length.times { @line.right }
       focused_input_box.position = @line.position
@@ -747,15 +753,21 @@ module RawLine
     # line history, to allow undo/redo
     # operations.
     #
-    def add_to_line_history
-      @line.history << @line.text.dup unless @line.text == ""
+    def add_to_line_history(allow_empty: false)
+      if allow_empty || !@line.text.empty?
+        Treefell['editor'].puts "add_to_line_history text=#{@line.text}"
+        @line.history << @line.text.dup
+      end
     end
 
     #
     # Add the current line (<tt>@line.text</tt>) to the editor history.
     #
-    def add_to_history
-      history << @line.text.dup if @add_history && @line.text != ""
+    def add_to_history(allow_empty: false)
+      if @add_history && (allow_empty || !@line.text.empty?)
+        Treefell['editor'].puts "add_to_history text=#{@line.text}"
+        history << @line.text.dup
+      end
     end
 
     ############################################################################
@@ -849,6 +861,7 @@ module RawLine
     def generic_history_back(history)
       unless history.empty?
         history.back
+        Treefell['editor'].puts "generic_history_back position=#{history.position} history=#{history.to_a.inspect}"
         line = history.get
         return unless line
 
@@ -859,6 +872,7 @@ module RawLine
 
     def generic_history_forward(history)
       if history.forward
+        Treefell['editor'].puts "generic_history_back position=#{history.position} history=#{history.to_a.inspect}"
         line = history.get
         return unless line
 
