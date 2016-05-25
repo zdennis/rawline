@@ -403,7 +403,7 @@ module RawLine
 
     def delete_n_characters(number_of_characters_to_delete, no_line_history=false)
       Treefell['editor'].puts "delete_n_characters n=#{number_of_characters_to_delete}"
-      if @line_editor.delete_n_characters
+      if @line_editor.delete_n_characters(number_of_characters_to_delete)
         add_to_line_history unless no_line_history
         history.clear_position
       end
