@@ -268,6 +268,8 @@ module RawLine
 
     def process_line
       @event_loop.add_event(name: "process_line", source: self) do
+        add_to_history
+
         @terminal.snapshot_tty_attrs
         @terminal.pseudo_cooked!
 
