@@ -821,7 +821,7 @@ module RawLine
 
       @dom.on(:child_changed) do |*args|
         Treefell['editor'].puts 'DOM child changed, re-rendering'
-        @event_loop.add_event name: "render", source: @dom#, target: event[:target]
+        @event_loop.add_event name: "render"
       end
 
       @dom.on :position_changed do |*args|
