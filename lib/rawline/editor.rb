@@ -815,6 +815,11 @@ module RawLine
       end
       @event_loop = Rawline::EventLoop.new(registry: @event_registry)
 
+      @dom.on(:content_changed) do |*args|
+        Treefell['editor'].puts 'DOM content changed, re-rendering'
+        @event_loop.add_event name: "render"
+      end
+
       @dom.on(:child_changed) do |*args|
         Treefell['editor'].puts 'DOM child changed, re-rendering'
         @event_loop.add_event name: "render", source: @dom#, target: event[:target]
