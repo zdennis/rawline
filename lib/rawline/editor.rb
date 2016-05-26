@@ -257,12 +257,11 @@ module RawLine
       key_code_sequences = parse_key_code_sequences(bytes)
       key_code_sequences.each do |sequence|
         @char = sequence
-        process_character
-
-        new_position = @line.position
-
         if @char == @terminal.keys[:enter] || !@char
           process_line
+        else
+          process_character
+          new_position = @line.position
         end
       end
     end
