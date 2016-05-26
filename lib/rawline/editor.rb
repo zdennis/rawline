@@ -272,8 +272,9 @@ module RawLine
         @terminal.snapshot_tty_attrs
         @terminal.pseudo_cooked!
 
-        move_to_beginning_of_input
+        @terminal.move_to_beginning_of_row
         @terminal.puts
+        move_to_beginning_of_input
       end
 
       @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup }
