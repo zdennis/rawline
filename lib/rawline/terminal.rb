@@ -129,12 +129,24 @@ module RawLine
       term_info.control "el1"
     end
 
+    def clear_to_end_of_line
+      term_info.control "el"
+    end
+
     def clear_screen
       term_info.control "clear"
     end
 
     def clear_screen_down
       term_info.control "ed"
+    end
+
+    def hide_cursor
+      term_info.control_string "civis"
+    end
+
+    def show_cursor
+      term_info.control_string "cnorm"
     end
 
     def move_to_beginning_of_row
