@@ -24,5 +24,10 @@ module RawLine
       @focused_input_box = box
       @focused_input_box.focus! if @focused_input_box
     end
+
+    def input_box=(box)
+      @input_box = box
+      focus_input_box(@input_box)
+    end
   end
 end
