@@ -273,12 +273,14 @@ module RawLine
 
         @terminal.move_to_beginning_of_row
         @terminal.puts
-        move_to_beginning_of_input
       end
 
-      @event_loop.add_event name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup }
+      @event_loop.add_event(name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup })
+      @event_loop.add_event(name: "prepare_new_line", source: self) do
+        move_to_beginning_of_input
+      end
       @event_loop.add_event(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
-      @event_loop.add_event name: "render", source: self, payload: { reset: true }
+      @event_loop.add_event(name: "render", source: self, payload: { reset: true })
     end
 
     #
