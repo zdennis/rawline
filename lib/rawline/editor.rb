@@ -830,10 +830,10 @@ module RawLine
         @renderer.render
       end
 
-      # @dom.on :focus_changed do |*args|
-      #   Treefell['editor'].puts 'DOM position changed, rendering cursor'
-      #   @renderer.render
-      # end
+      @dom.on :focus_changed do |*args|
+        Treefell['editor'].puts 'DOM focused changed, re-rendering'
+        @renderer.render
+      end
 
       @event_registry.subscribe :render, -> (_) { render(reset: false) }
     end
