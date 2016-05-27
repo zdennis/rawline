@@ -135,7 +135,7 @@ module RawLine
 
       @env_stack = [Environment.new]
 
-      @word_break_characters = " \t\n\"'@><=;|&{("
+      @word_break_characters = " \t\n\"'@><=;|&{()}"
       @mode = :insert
 
       @completion_proc = filename_completion_proc
