@@ -19,7 +19,7 @@ Gem::Specification.new do |s|
   s.files += ["README.rdoc", "LICENSE", "CHANGELOG.rdoc"]
 
   s.add_dependency "highline", "~> 1.7", ">= 1.7.2"
-  s.add_dependency "terminal-layout", "~> 0.3.1"
+  s.add_dependency "terminal-layout", "~> 0.4.0"
   s.add_dependency "term-ansicolor", "~> 1.3.0"
   s.add_dependency "treefell", "~> 0.2.3"
 
