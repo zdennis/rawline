@@ -38,6 +38,10 @@ module RawLine
       @events = @events.reject { |event| event[:_event_id] == event_id }
     end
 
+    def immediately(**event_kwargs, &blk)
+      dispatch_event(event_kwargs.merge(_event_callback: blk))
+    end
+
     def reset
       @events.clear
       @counter = 0

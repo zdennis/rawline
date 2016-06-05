@@ -277,9 +277,7 @@ module RawLine
     end
 
     def process_line
-      text_to_process = @line.text.without_ansi.dup
-
-      @event_loop.add_event(name: "process_line", source: self) do
+      @event_loop.immediately(name: "process_line", source: self) do
         add_to_history
 
         @terminal.snapshot_tty_attrs
@@ -288,14 +286,13 @@ module RawLine
         @terminal.move_to_beginning_of_row
         @terminal.puts
       end
-
-      @event_loop.add_event(name: "line_read", source: self, payload: { line: text_to_process })
-      @event_loop.add_event(name: "prepare_new_line", source: self) do
+      @event_loop.immediately(name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup })
+      @event_loop.immediately(name: "prepare_new_line", source: self) do
         reset_line
         move_to_beginning_of_input
       end
-      @event_loop.add_event(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
-      @event_loop.add_event(name: "render", source: self, payload: { reset: true })
+      @event_loop.immediately(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
+      @event_loop.immediately(name: "render", source: self, payload: { reset: true })
     end
 
     #
