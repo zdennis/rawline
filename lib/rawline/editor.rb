@@ -252,18 +252,27 @@ module RawLine
 
     def read_bytes(bytes)
       return unless bytes.any?
+      @renderer.pause
+
+      Treefell['editor'].puts "read_bytes #{bytes.inspect}"
       old_position = @line.position
 
       key_code_sequences = parse_key_code_sequences(bytes)
+
+      Treefell['editor'].puts "key code sequences: #{key_code_sequences.inspect}"
       key_code_sequences.each do |sequence|
         @char = sequence
         if @char == @terminal.keys[:enter] || !@char
+          Treefell['editor'].puts "processing line: #{@line.text.inspect}"
+          @renderer.pause
           process_line
         else
           process_character
           new_position = @line.position
         end
       end
+    ensure
+      @renderer.unpause
     end
 
     def process_line

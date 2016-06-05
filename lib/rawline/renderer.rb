@@ -12,9 +12,28 @@ module RawLine
       )
     end
 
+    def pause
+      @paused = true
+    end
+
+    def unpause
+      @paused = false
+      if @render_on_unpause_kwargs
+        render(**@render_on_unpause_kwargs)
+        @render_on_unpause = nil
+      end
+    end
+
     def render(reset: false)
-      @render_tree.layout
-      @renderer.render(@render_tree, reset: reset)
+      Treefell['editor'].puts "#{self.class}##{__callee__} reset=#{reset}"
+      if @paused
+        Treefell['editor'].puts "    paused"
+        @render_on_unpause_kwargs = {reset: reset}
+      else
+        Treefell['editor'].puts "    unpaused"
+        @render_tree.layout
+        @renderer.render(@render_tree, reset: reset)
+      end
     end
 
     def render_cursor
