@@ -18,8 +18,13 @@ module RawLine
       begin
         file_descriptor_flags = @input.fcntl(Fcntl::F_GETFL, 0)
         loop do
-          string = @input.read_nonblock(4096)
-          bytes.concat string.bytes
+          begin
+            string = @input.read_nonblock(4096)
+            bytes.concat string.bytes
+          rescue EOFError
+            sleep 0.1
+            retry
+          end
         end
       rescue IO::WaitReadable
         # reset flags so O_NONBLOCK is turned off on the file descriptor
