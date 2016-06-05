@@ -266,6 +266,7 @@ module RawLine
           Treefell['editor'].puts "processing line: #{@line.text.inspect}"
           @renderer.pause
           process_line
+          @renderer.unpause
         else
           process_character
           new_position = @line.position
