@@ -80,17 +80,20 @@ module RawLine
     CursorPosition = Struct.new(:column, :row)
 
     def raw!
+      return unless @input.isatty
       @input.raw!
     end
 
     def cooked!
+      return unless @input.isatty
       @input.cooked!
     end
 
     def pseudo_cooked!
+      return unless @input.isatty
+
       old_tty_attrs = Termios.tcgetattr(@input)
       new_tty_attrs = old_tty_attrs.dup
-
 
       new_tty_attrs.cflag |= Termios::BRKINT | Termios::ISTRIP | Termios::ICRNL | Termios::IXON
 
@@ -105,10 +108,12 @@ module RawLine
     end
 
     def snapshot_tty_attrs
+      return unless @input.isatty
       @snapshotted_tty_attrs << Termios.tcgetattr(@input)
     end
 
     def restore_tty_attrs
+      return unless @input.isatty
       Termios::tcsetattr(@input, Termios::TCSANOW, @snapshotted_tty_attrs.pop)
     end
 
@@ -182,7 +187,9 @@ module RawLine
     end
 
     def puts(*args)
-      @output.cooked do
+      if @output.isatty
+        @output.cooked { @output.puts(*args) }
+      else
         @output.puts(*args)
       end
     end
