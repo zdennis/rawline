@@ -288,6 +288,7 @@ module RawLine
       end
       @event_loop.immediately(name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup })
       @event_loop.immediately(name: "prepare_new_line", source: self) do
+        history.clear_position
         reset_line
         move_to_beginning_of_input
       end
