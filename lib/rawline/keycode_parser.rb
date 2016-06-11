@@ -2,6 +2,7 @@ module RawLine
   class KeycodeParser
     def initialize(keymap)
       @keymap = keymap
+      @inverted_keymap = @keymap.invert
       @escape_code = keymap[:escape]
     end
 
@@ -41,45 +42,37 @@ module RawLine
       bytes.pack('C*').force_encoding('UTF-8')
     end
 
-    def parse_bytes(bytes)
-      i = 0
-      results = []
-      loop do
-        byte = bytes[i]
-
-        keycode = find_keycode_for_multi_byte_sequence(bytes[i..-1])
-        if keycode
-          results << keycode
-          i += keycode.length
-        else
-          results << byte.ord
-          i += 1
+    def parse_bytes bytes
+      if bytes.empty?
+        []
+      elsif bytes.any?
+        results = []
+        index = 0
+        loop do
+          sequence = byte_sequence_for(bytes[index..-1])
+          results.concat sequence
+          index += sequence.length
+          break if index >= bytes.length
         end
-
-        break if i >= bytes.length
+        results
       end
-      results
     end
 
-    private
-
-    # {:left_arrow=>[27, 91, 68]}
-    # [27, 91, 68]
-    def find_keycode_for_multi_byte_sequence(bytes)
-      i = 0
-      sequence = []
-      loop do
-        byte = bytes[i]
-        if @keymap.values.any?{ |arr| arr[i] == byte }
-          sequence << byte
-          i += 1
-        else
-          break
-        end
-        break if i >= bytes.length
+    # This returns the longer possible known byte sequence for the given
+    # bytes. It returns every sequence wrapped in an array so if it knows
+    # about a multi-byte sequence like :left_arrow then it will return
+    # [[27,91,68]]. If it does not have a matching byte sequence it will
+    # return a single element array, e.g. [12].
+    def byte_sequence_for(bytes)
+      if @inverted_keymap[bytes]
+        [bytes]
+      elsif bytes.length == 1
+        bytes
+      elsif bytes.length == 0
+        fail "Bytes cannot be zero length"
+      else
+        byte_sequence_for(bytes[0..-2])
       end
-
-      sequence.any? ? sequence : nil
     end
   end
 end
