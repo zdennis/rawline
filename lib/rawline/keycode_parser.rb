@@ -51,7 +51,7 @@ module RawLine
         loop do
           sequence = byte_sequence_for(bytes[index..-1])
           results.concat sequence
-          index += sequence.length
+          index += sequence.first.is_a?(Array) ? sequence.first.length : sequence.length
           break if index >= bytes.length
         end
         results
