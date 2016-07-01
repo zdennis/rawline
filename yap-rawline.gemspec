@@ -20,8 +20,8 @@ Gem::Specification.new do |s|
 
   s.add_dependency "ansi_string", "~> 0.1"
   s.add_dependency "highline", "~> 1.7", ">= 1.7.2"
-  s.add_dependency "terminal-layout", "~> 0.4"
+  s.add_dependency "terminal-layout", "~> 0.4.2"
   s.add_dependency "term-ansicolor", "~> 1.3.0"
-  
+
   s.add_development_dependency "rspec", "~> 3.0"
 end
