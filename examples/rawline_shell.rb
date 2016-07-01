@@ -74,7 +74,7 @@ editor.bind(:ctrl_w){
 # History forward, but if at the end of the history then give user a
 # blank line rather than remain on the last command
 editor.bind(:down_arrow) {
-  if editor.history.searching? && !editor.history.end?
+  if editor.history && !editor.history.end?
     editor.history_forward
   else
     editor.overwrite_line ""

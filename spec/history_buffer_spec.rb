@@ -103,4 +103,83 @@ describe RawLine::HistoryBuffer do
     expect(@history.size).to eq(6)
     expect(@history.position).to eq(nil)
   end
+
+  describe 'finding matches in history, forward and backward' do
+    before do
+      @history.resize(100)
+      @history << 'echo foo'
+      @history << 'echo bar'
+      @history << 'echo baz'
+      @history << 'echo food'
+      @history << 'echo bark'
+      @history << 'echo bonanza'
+    end
+
+    describe '#find_match_backward' do
+      context 'when the position starts as nil' do
+        it 'finds the first item back that matches' do
+          @history.clear_position
+          expect(@history.find_match_backward('bonanza')).to eq 'echo bonanza'
+
+          @history.clear_position
+          expect(@history.find_match_backward('foo')).to eq 'echo food'
+        end
+
+        it 'can find consecutive matches, skipping unmatched items' do
+          @history.clear_position
+          expect(@history.find_match_backward('foo')).to eq 'echo food'
+          $z = true
+          expect(@history.find_match_backward('foo')).to eq 'echo foo'
+        end
+      end
+
+      context 'when the position starts as non-nil' do
+        it 'finds the first item back that matches from the current position' do
+          3.times { @history.back }
+          expect(@history.find_match_backward('bar')).to eq 'echo bar'
+        end
+      end
+    end
+
+    describe '#find_match_forward' do
+      context 'when the position starts as nil' do
+        it 'finds the first item from the beginning that matches' do
+          @history.clear_position
+          expect(@history.find_match_forward('bar')).to eq 'echo bar'
+          expect(@history.position).to eq @history.index('echo bar')
+
+          @history.clear_position
+          expect(@history.find_match_forward('foo')).to eq 'echo foo'
+          expect(@history.position).to eq @history.index('echo foo')
+        end
+
+        it 'can find consecutive matches, skipping unmatched items' do
+          @history.clear_position
+          expect(@history.find_match_forward('foo')).to eq 'echo foo'
+          expect(@history.position).to eq @history.index('echo foo')
+
+          expect(@history.find_match_forward('foo')).to eq 'echo food'
+          expect(@history.position).to eq @history.index('echo food')
+        end
+      end
+
+      context 'when the position starts as non-nil' do
+        it 'finds the first item back that matches from the current position' do
+          3.times { @history.back }
+          expect(@history.find_match_forward('bar')).to eq 'echo bark'
+          expect(@history.position).to eq @history.index('echo bark')
+        end
+      end
+
+      context 'when its gone all the way back, and we want to go forward' do
+        it 'd' do
+          @history.length.times do
+            @history.find_match_backward('bar')
+          end
+          expect(@history.find_match_forward('bar')).to eq 'echo bark'
+        end
+      end
+    end
+
+  end
 end

@@ -46,10 +46,6 @@ module RawLine
       @position = nil
     end
 
-    def searching?
-      !!@position
-    end
-
     #
     # Resize the buffer, resetting <tt>@position</tt> to nil.
     #
@@ -59,6 +55,26 @@ module RawLine
       end
       @size = new_size
       @position = nil
+    end
+
+    def find_match_backward(text)
+      regex = to_regex(text)
+      offset = @position ? length - position : 0
+      reverse[offset..-1].detect.with_index do |item, index|
+        if item.match(regex)
+          @position = length - index - (offset + 1)
+        end
+      end
+    end
+
+    def find_match_forward(text)
+      regex = to_regex(text)
+      offset = @position ? @position + 1 : 0
+      self[offset..-1].detect.with_index do |item, index|
+        if item.match(regex)
+          @position = index + offset
+        end
+      end
     end
 
     #
@@ -168,6 +184,12 @@ module RawLine
 
     alias << push
 
+    private
+
+    def to_regex(text)
+      return text if text.is_a?(Regexp)
+      /#{Regexp.escape(text)}/
+    end
   end
 
 end
