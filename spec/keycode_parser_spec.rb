@@ -6,32 +6,23 @@ describe RawLine::KeycodeParser do
   subject(:keycode_parser) { described_class.new(keymap) }
   let(:keymap) { {} }
 
-  describe "#parse_bytes" do
-    def parse_bytes(bytes)
-      keycode_parser.parse_bytes(bytes)
+  describe "#parse_bytes_into_sequences" do
+    let(:parse) do
+      keycode_parser.parse_bytes_into_sequences(bytes)
     end
+    let(:bytes){ fail 'Implement :bytes in context/describe for relevant example' }
 
     context "given a char that isn't in the keymap" do
+      let(:bytes){ "a".bytes }
       it "returns the byte as a keycode" do
-        expect(parse_bytes(["a"])).to eq ["a".ord]
-      end
-    end
-
-    context "given a char that isn't in the keymap" do
-      it "returns the byte as a keycode" do
-        expect(parse_bytes([97])).to eq ["a".ord]
+        expect(parse).to eq ["a"]
       end
     end
 
     context "given multiple characters that aren't in the keymap" do
+      let(:bytes){ "abC".bytes }
       it "returns the bytes as individual keycodes" do
-        expect(parse_bytes(["a", "b", "C"])).to eq ["a", "b", "C"].map(&:ord)
-      end
-    end
-
-    context "given multiple characters that aren't in the keymap" do
-      it "returns the bytes as individual keycodes" do
-        expect(parse_bytes([97, 98, 67])).to eq ["a", "b", "C"].map(&:ord)
+        expect(parse).to eq ["abC"]
       end
     end
 
@@ -39,9 +30,10 @@ describe RawLine::KeycodeParser do
       let(:keymap) do
         { backspace: [?\C-?.ord] }
       end
+      let(:bytes){ [127] }
 
       it "returns the bytes as a single key code" do
-        expect(parse_bytes([127])).to eq [[127]]
+        expect(parse).to eq ["", [127]]
       end
     end
 
@@ -49,9 +41,10 @@ describe RawLine::KeycodeParser do
       let(:keymap) do
         { backspace: [?\C-?.ord] }
       end
+      let(:bytes) { [97, 127, 67] }
 
       it "returns the key codes appropriately" do
-        expect(parse_bytes([97, 127, 67])).to eq [97, [127], 67]
+        expect(parse).to eq ["a", [127], "C"]
       end
     end
 
@@ -59,9 +52,10 @@ describe RawLine::KeycodeParser do
       let(:keymap) do
         { left_arrow: [?\e.ord, ?[.ord, ?D.ord] }
       end
+      let(:bytes) { [?\e.ord, ?[.ord, ?D.ord] }
 
       it "returns a single key code" do
-        expect(parse_bytes([?\e.ord, ?[.ord, ?D.ord])).to eq [[?\e.ord, ?[.ord, ?D.ord]]
+        expect(parse).to eq ["", [27, 91, 68]]
       end
     end
 
@@ -69,9 +63,10 @@ describe RawLine::KeycodeParser do
       let(:keymap) do
         { left_arrow: [?\e.ord, ?[.ord, ?D.ord] }
       end
+      let(:bytes) { ["a".ord, ?\e.ord, ?[.ord, ?D.ord, "C".ord] }
 
       it "returns a keycodes appropriately" do
-        expect(parse_bytes([97, ?\e.ord, ?[.ord, ?D.ord, 67])).to eq [97, [?\e.ord, ?[.ord, ?D.ord], 67]
+        expect(parse).to eq ["a", [?\e.ord, ?[.ord, ?D.ord], "C"]
       end
     end
 
