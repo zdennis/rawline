@@ -38,6 +38,8 @@ describe RawLine::Editor do
   let(:dom) { RawLine::DomTree.new }
   let(:renderer) do
     instance_double(RawLine::Renderer,
+      pause: nil,
+      unpause: nil,
       render_cursor: nil,
       render: nil
     )

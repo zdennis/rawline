@@ -90,13 +90,14 @@ module RawLine
     class Environment
       attr_accessor :keys, :completion_class, :history, :word_separator
       attr_accessor :keyboard_input_processors
+      attr_accessor :terminal
 
       # * <tt>@history_size</tt> - the size of the editor history buffer (30).
       # * <tt>@keys</tt> - the keys (arrays of character codes) bound to specific actions.
       # * <tt>@line_history_size</tt> - the size of the editor line history buffer (50).
-      def initialize(env: nil)
+      def initialize(env: nil, terminal: nil)
         @env = env
-        @keys = KeyBindings.new
+        @keys = KeyBindings.new(terminal: terminal)
         @keyboard_input_processors = []
 
         @completion_class = Completer
@@ -133,7 +134,7 @@ module RawLine
       @renderer = renderer
       @terminal = terminal
 
-      @env_stack = [Environment.new]
+      @env_stack = [Environment.new(terminal: terminal)]
 
       @word_break_characters = " \t\n\"'@><=;|&{()}"
       @mode = :insert
