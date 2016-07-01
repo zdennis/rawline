@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    yap-rawline (0.5.1)
+    yap-rawline (0.6.0)
       highline (~> 1.7, >= 1.7.2)
       term-ansicolor (~> 1.3.0)
       terminal-layout (~> 0.4.0)
@@ -58,4 +58,4 @@ DEPENDENCIES
   yap-rawline!
 
 BUNDLED WITH
-   1.11.2
+   1.12.5
