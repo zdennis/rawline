@@ -3,8 +3,7 @@
 require_relative "../lib/rawline/history_buffer.rb"
 
 describe RawLine::HistoryBuffer do
-
-  before :each do
+  before do
     @history = RawLine::HistoryBuffer.new(5)
   end
 
@@ -18,15 +17,15 @@ describe RawLine::HistoryBuffer do
     @history << "line #2"
     @history << "line #3"
     @history << "line #2"
-    expect(@history).to eq(["line #1", "line #3", "line #2"])
+    expect(@history).to eq(["line #1",  "line #2", "line #3"])
     @history.duplicates = true
     @history << "line #3"
-    expect(@history).to eq(["line #1", "line #3", "line #2", "line #3"])
+    expect(@history).to eq(["line #1", "line #2", "line #3", "line #3"])
     @history.exclude = lambda { |i| i.match(/line #[456]/) }
     @history << "line #4"
     @history << "line #5"
     @history << "line #6"
-    expect(@history).to eq(["line #1", "line #3", "line #2", "line #3"])
+    expect(@history).to eq(["line #1", "line #2", "line #3", "line #3"])
   end
 
   it "does not overflow" do

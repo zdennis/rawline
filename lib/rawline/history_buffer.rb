@@ -90,7 +90,7 @@ module RawLine
     #
     def get
       return nil unless length > 0
-      return nil unless @position
+      @position = length-1 unless @position
       at(@position).dup
     end
 
@@ -164,8 +164,7 @@ module RawLine
     # Add a new item to the buffer.
     #
     def push(item)
-
-      if !@duplicates && self[-1] == item
+      if !@duplicates && include?(item)
         # skip adding this line
         return
       end
