@@ -144,13 +144,14 @@ module RawLine
     # with <tt>new_line</tt>, and optionally reset the cursor position to
     # <tt>position</tt>.
     #
-    def overwrite_line(new_line, position=nil, options={})
+    def overwrite_line(new_line, position: nil, highlight_up_to: nil)
+      position = @line.position if position == :preserve
       text = @line.text
       @highlighting = false
 
-      if options[:highlight_up_to]
+      if highlight_up_to
         @highlighting = true
-        new_line = highlight_text_up_to(new_line, options[:highlight_up_to])
+        new_line = highlight_text_up_to(new_line, highlight_up_to)
       end
 
       @line.position = position || new_line.length

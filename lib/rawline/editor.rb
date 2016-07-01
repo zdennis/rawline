@@ -537,9 +537,9 @@ module RawLine
     # with <tt>new_line</tt>, and optionally reset the cursor position to
     # <tt>position</tt>.
     #
-    def overwrite_line(new_line, position=nil, options={})
-      Treefell['editor'].puts "overwrite_line new_line=#{new_line} position=#{position} options=#{options.inspect}"
-      if @line_editor.overwrite_line(new_line, position, options)
+    def overwrite_line(new_line, position: nil, highlight_up_to: nil)
+      Treefell['editor'].puts "overwrite_line new_line=#{new_line} position=#{position} highlight_up_to=#{highlight_up_to}"
+      if @line_editor.overwrite_line(new_line, position: position, highlight_up_to: highlight_up_to)
         @event_loop.add_event name: "render", source: focused_input_box
       end
     end
@@ -722,7 +722,7 @@ module RawLine
         @terminal.puts sprintf("%-#{max_index_width}d %s\n", i+1, item)
       end
       render(reset: true)
-      overwrite_line(text, pos)
+      overwrite_line(text, position: pos)
     end
 
     #
@@ -813,7 +813,7 @@ module RawLine
       # terminal.puts "Character at Position: [#{text[pos].chr}] (#{text[pos]})" unless pos >= @line.length
       # terminal.puts "Current Word: [#{word[:text]}] (#{word[:start]} -- #{word[:end]})"
       clear_line
-      overwrite_line(text, pos)
+      overwrite_line(text, position: pos)
     end
 
     def focus_input_box(box)
@@ -893,7 +893,7 @@ module RawLine
         return unless line
 
         cursor_position = nil
-        overwrite_line(line, cursor_position, highlight_up_to: cursor_position)
+        overwrite_line(line, position: cursor_position, highlight_up_to: cursor_position)
       end
     end
 
@@ -904,7 +904,7 @@ module RawLine
         return unless line
 
         cursor_position = nil
-        overwrite_line(line, cursor_position, highlight_up_to: cursor_position)
+        overwrite_line(line, position: cursor_position, highlight_up_to: cursor_position)
       end
     end
 

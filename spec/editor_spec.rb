@@ -335,7 +335,7 @@ describe RawLine::Editor do
     input << "test #8a"
     input.rewind
     @editor.event_loop.tick
-    @editor.overwrite_line("test #8b", 2)
+    @editor.overwrite_line("test #8b", position: 2)
     expect(@editor.line.text).to eq("test #8b")
     expect(@editor.line.position).to eq(2)
   end
