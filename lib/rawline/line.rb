@@ -1,4 +1,4 @@
-#!usr/bin/env ruby
+require 'ansi_string'
 
 #
 #  line.rb
@@ -54,6 +54,10 @@ module RawLine
 
     def text=(val)
       @text = ANSIString.new(val)
+    end
+
+    def text_up_to_position
+      text[0...position]
     end
 
     #

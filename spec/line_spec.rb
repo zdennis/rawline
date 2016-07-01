@@ -8,7 +8,7 @@ require_relative "../lib/rawline/line.rb"
 
 describe RawLine::Line do
 
-  before :each do
+  before do
     @line = RawLine::Line.new(5) {|l| l.prompt = "=>" }
   end
 
@@ -53,6 +53,19 @@ describe RawLine::Line do
     expect(@line.word).to eq({:start => 0, :end => 3, :text => "This"})
     @line.right
     expect(@line.word).to eq({:start => 5, :end => 6, :text => "is"})
+  end
+
+  describe '#text_up_to_position' do
+    subject(:line) { described_class.new }
+
+    it 'returns the text up to, but not including the current position' do
+      line << 'abcdefghij'
+      line.position = 1
+      expect(line.text_up_to_position).to eq('a')
+
+      line.position = 7
+      expect(line.text_up_to_position).to eq('abcdefg')
+    end
   end
 
 end
