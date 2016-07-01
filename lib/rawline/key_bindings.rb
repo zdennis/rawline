@@ -6,8 +6,8 @@ module RawLine
       attr_accessor :default_terminal
     end
 
-    def initialize(terminal: self.class.default_terminal)
-      @terminal = terminal
+    def initialize(terminal: nil)
+      @terminal = terminal || self.class.default_terminal
       @keys = {}
     end
 
@@ -104,6 +104,6 @@ module RawLine
         @terminal.keys[j] = code
         keys[code] = block
       end
-    end    
+    end
   end
 end
