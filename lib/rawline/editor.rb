@@ -830,7 +830,7 @@ module RawLine
 
       @dom.on(:content_changed) do |*args|
         Treefell['editor'].puts 'DOM content changed, re-rendering'
-        @event_loop.add_event name: "render"
+        @event_loop.immediately name: "render"
       end
 
       @dom.on(:child_changed) do |*args|
