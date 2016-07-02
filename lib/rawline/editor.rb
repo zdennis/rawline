@@ -213,17 +213,17 @@ module RawLine
 
       Signal.trap("SIGWINCH") do
         Treefell['editor'].puts "terminal-resized trap=SIGWINCH"
-        @event_loop.add_event name: "terminal-resized", source: self
+        @event_loop.add_event name: "terminal-resized"
       end
 
       @event_registry.subscribe("terminal-resized") do
         width, height = terminal_width, terminal_height
         Treefell['editor'].puts "terminal-resizing width=#{width} height=#{height}"
         @renderer.update_dimensions(width: width, height: height)
-        @event_loop.add_event name: "render", source: self
+        @event_loop.add_event name: "render"
       end
 
-      @event_loop.add_event name: "render", source: self
+      @event_loop.add_event name: "render"
       @event_loop.start
     end
 
@@ -248,7 +248,7 @@ module RawLine
       if bytes.any?
         keyboard_input_processor.read_bytes(bytes)
       end
-      @event_loop.add_event name: 'check_for_keyboard_input', source: self
+      @event_loop.add_event name: 'check_for_keyboard_input'
     end
 
     def read_bytes(bytes)
@@ -276,7 +276,7 @@ module RawLine
     end
 
     def process_line
-      @event_loop.immediately(name: "process_line", source: self) do
+      @event_loop.immediately(name: "process_line") do
         add_to_history
 
         @terminal.snapshot_tty_attrs
@@ -285,14 +285,14 @@ module RawLine
         @terminal.move_to_beginning_of_row
         @terminal.puts
       end
-      @event_loop.immediately(name: "line_read", source: self, payload: { line: @line.text.without_ansi.dup })
-      @event_loop.immediately(name: "prepare_new_line", source: self) do
+      @event_loop.immediately(name: "line_read", payload: { line: @line.text.without_ansi.dup })
+      @event_loop.immediately(name: "prepare_new_line") do
         history.clear_position
         reset_line
         move_to_beginning_of_input
       end
-      @event_loop.immediately(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
-      @event_loop.immediately(name: "render", source: self, payload: { reset: true  })
+      @event_loop.immediately(name: "restore_tty_attrs") { @terminal.restore_tty_attrs }
+      @event_loop.immediately(name: "render", payload: { reset: true  })
     end
 
     #

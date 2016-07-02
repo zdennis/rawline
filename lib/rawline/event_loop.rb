@@ -10,7 +10,6 @@ module RawLine
 
     # event looks like:
     #  * name
-    #  * source
     #  * target
     #  * payload
     def add_event(**event, &blk)
@@ -100,7 +99,7 @@ module RawLine
     end
 
     def default_event
-      { name: 'default', source: self, _event_id: -1 }
+      { name: 'default', _event_id: -1 }
     end
 
     def recur_at(interval_in_ms)
