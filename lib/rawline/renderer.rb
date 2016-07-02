@@ -5,7 +5,7 @@ module RawLine
       @output = output
       @paused = false
       @paused_attempts = []
-      @renderer = TerminalLayout::TerminalRenderer.new(output: output)
+      @renderer = TerminalLayout::Renderer.new(output: output)
       @render_tree = TerminalLayout::RenderTree.new(
         dom,
         parent: nil,
