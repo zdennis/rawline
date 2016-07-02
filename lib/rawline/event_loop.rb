@@ -17,6 +17,10 @@ module RawLine
         event[:_event_callback] = blk if blk
       end
 
+      unless event.has_key?(:_event_caller)
+        event[:_event_caller] = caller[0..5]
+      end
+
       unless event.has_key?(:_event_id)
         @counter += 1
         event[:_event_id] = @counter
@@ -38,7 +42,7 @@ module RawLine
     end
 
     def immediately(**event_kwargs, &blk)
-      dispatch_event(event_kwargs.merge(_event_callback: blk))
+      dispatch_event(event_kwargs.merge(_event_callback: blk, _event_caller: caller[0..5]))
     end
 
     def reset
