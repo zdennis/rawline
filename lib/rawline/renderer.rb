@@ -3,6 +3,8 @@ module RawLine
     def initialize(dom:, output:, width:, height:)
       @dom = dom
       @output = output
+      @paused = false
+      @paused_attempts = []
       @renderer = TerminalLayout::TerminalRenderer.new(output: output)
       @render_tree = TerminalLayout::RenderTree.new(
         dom,
@@ -16,23 +18,26 @@ module RawLine
       @paused = true
     end
 
+    def paused?
+      @paused
+    end
+
     def render(reset: false, &blk)
-      Treefell['editor'].puts %|#{self.class}##{__callee__} reset=#{reset}}|
       if @paused
-        Treefell['editor'].puts "    paused"
-        if @render_on_unpause_kwargs && @render_on_unpause_kwargs[:reset]
-          reset = true
-        end
-        @render_on_unpause_kwargs = {reset: reset}
+        @paused_attempts << [:render, { reset: reset }]
       else
-        Treefell['editor'].puts "    unpaused"
+        Treefell['render'].puts %|\nRenderer:#{self.class}##{__callee__} reset=#{reset} caller=#{caller[0..5].join("\n")}}|
         @render_tree.layout
         @renderer.render(@render_tree, reset: reset)
       end
     end
 
     def render_cursor
-      @renderer.render_cursor(@dom.focused_input_box)
+      if @paused
+        @paused_attempts << [:render_cursor, {}]
+      else
+        @renderer.render_cursor(@dom.focused_input_box)
+      end
     end
 
     def rollup(&blk)
@@ -42,6 +47,7 @@ module RawLine
           blk.call
         ensure
           unpause
+          rollup_render_paused_attempts
         end
       end
     end
@@ -57,6 +63,27 @@ module RawLine
         render(**@render_on_unpause_kwargs)
         @render_on_unpause_kwargs = nil
       end
+    end
+
+    private
+
+    def rollup_render_paused_attempts
+      render_attempts = @paused_attempts.select do |attempt|
+        attempt.first == :render
+      end
+
+      # rendering handles render_cursor so only explicitly rerender the
+      # cursor if there were no render attempts
+      if render_attempts.any?
+        reset = render_attempts.any?{ |attempt| attempt.last[:reset] }
+        render reset: reset
+      else
+        if @paused_attempts.any? { |attempt| attempt.first == :render_cursor }
+          render_cursor
+        end
+      end
+    ensure
+      @paused_attempts.clear
     end
   end
 end
