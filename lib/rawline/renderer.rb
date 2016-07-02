@@ -12,19 +12,11 @@ module RawLine
       )
     end
 
-    def pause
+    def pause(&blk)
       @paused = true
     end
 
-    def unpause
-      @paused = false
-      if @render_on_unpause_kwargs
-        render(**@render_on_unpause_kwargs)
-        @render_on_unpause = nil
-      end
-    end
-
-    def render(reset: false)
+    def render(reset: false, &blk)
       Treefell['editor'].puts %|#{self.class}##{__callee__} reset=#{reset}}|
       if @paused
         Treefell['editor'].puts "    paused"
@@ -43,9 +35,28 @@ module RawLine
       @renderer.render_cursor(@dom.focused_input_box)
     end
 
+    def rollup(&blk)
+      if block_given?
+        begin
+          pause
+          blk.call
+        ensure
+          unpause
+        end
+      end
+    end
+
     def update_dimensions(width:, height:)
       @render_tree.width = width
       @render_tree.height = height
+    end
+
+    def unpause
+      @paused = false
+      if @render_on_unpause_kwargs
+        render(**@render_on_unpause_kwargs)
+        @render_on_unpause_kwargs = nil
+      end
     end
   end
 end

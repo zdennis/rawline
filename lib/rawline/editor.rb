@@ -266,15 +266,12 @@ module RawLine
           if @char == @terminal.keys[:enter] || !@char
             Treefell['editor'].puts "processing line: #{@line.text.inspect}"
 
-            @renderer.pause
-            process_line
+            @renderer.rollup { process_line }
           else
             process_character
             new_position = @line.position
           end
         end
-      ensure
-        @renderer.unpause
       end
     end
 
