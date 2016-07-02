@@ -70,6 +70,18 @@ describe RawLine::KeycodeParser do
       end
     end
 
+    context "given multiple bytes which could map to multiple sequences" do
+      let(:keymap) do
+        { escape: [?\e.ord] }
+        { left_arrow: [?\e.ord, ?[.ord, ?D.ord] }
+      end
+      let(:bytes) { ["a".ord, ?\e.ord, ?[.ord, ?D.ord, "C".ord] }
+
+      it "returns the longest sequence matching" do
+        expect(parse).to eq ["a", [?\e.ord, ?[.ord, ?D.ord], "C"]
+      end
+    end
+
     context "given a lot of bytes" do
       let(:keymap) do
         { left_arrow: [?\e.ord, ?[.ord, ?D.ord] }

@@ -65,18 +65,23 @@ module RawLine
     # return a single element array, e.g. [12].
     def byte_sequence_for(bytes, more_bytes)
       results = []
-      if @inverted_keymap[bytes]
-        results << bytes
-      elsif more_bytes.length == 0
-        results.push *bytes
-      elsif @inverted_keymap.detect{ |kbytes, _| kbytes[0...bytes.length] == bytes }
-        # do _something
+      more_bytes ||= []
+      longer_sequence_possible = false
+      if more_bytes && more_bytes.any?
+         longer_sequence_possible = @inverted_keymap.detect do |kbytes, _|
+          kbytes[0..bytes.length] == bytes + more_bytes[0..0]
+        end
+      end
+
+      if longer_sequence_possible
         found_sequences = byte_sequence_for(bytes + [more_bytes.first], more_bytes[1..-1])
         if found_sequences.any?
           results.push *found_sequences
         else
           results.push *bytes
         end
+      elsif @inverted_keymap[bytes]
+        results.push bytes
       else
         results.push *bytes
       end
