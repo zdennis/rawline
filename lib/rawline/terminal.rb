@@ -209,10 +209,6 @@ module RawLine
       terminal_size[1]
     end
 
-    def cursor_position
-      cursor_position
-    end
-
     #
     # Update the terminal escape sequences. This method is called automatically
     # by RawLine::Editor#bind().
