@@ -292,7 +292,7 @@ module RawLine
         move_to_beginning_of_input
       end
       @event_loop.immediately(name: "restore_tty_attrs", source: self) { @terminal.restore_tty_attrs }
-      @event_loop.immediately(name: "render", source: self, payload: { reset: true })
+      @event_loop.immediately(name: "render", source: self, payload: { reset: true  })
     end
 
     #
@@ -840,7 +840,7 @@ module RawLine
 
       @dom.on :position_changed do |*args|
         Treefell['editor'].puts 'DOM position changed, rendering cursor'
-        @renderer.render
+        @renderer.render_cursor
       end
 
       @dom.on :focus_changed do |*args|
