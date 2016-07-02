@@ -49,7 +49,7 @@ module RawLine
         results = []
         index = 0
         loop do
-          sequence = byte_sequence_for(bytes[index..-1])
+          sequence = byte_sequence_for(bytes[index..index], bytes[index+1..-1])
           results.concat sequence
           index += sequence.first.is_a?(Array) ? sequence.first.length : sequence.length
           break if index >= bytes.length
@@ -63,16 +63,24 @@ module RawLine
     # about a multi-byte sequence like :left_arrow then it will return
     # [[27,91,68]]. If it does not have a matching byte sequence it will
     # return a single element array, e.g. [12].
-    def byte_sequence_for(bytes)
+    def byte_sequence_for(bytes, more_bytes)
+      results = []
       if @inverted_keymap[bytes]
-        [bytes]
-      elsif bytes.length == 1
-        bytes
-      elsif bytes.length == 0
-        fail "Bytes cannot be zero length"
+        results << bytes
+      elsif more_bytes.length == 0
+        results.push *bytes
+      elsif @inverted_keymap.detect{ |kbytes, _| kbytes[0...bytes.length] == bytes }
+        # do _something
+        found_sequences = byte_sequence_for(bytes + [more_bytes.first], more_bytes[1..-1])
+        if found_sequences.any?
+          results.push *found_sequences
+        else
+          results.push *bytes
+        end
       else
-        byte_sequence_for(bytes[0..-2])
+        results.push *bytes
       end
+      results
     end
   end
 end

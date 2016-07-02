@@ -70,22 +70,22 @@ describe RawLine::KeycodeParser do
       end
     end
 
+    context "given a lot of bytes" do
+      let(:keymap) do
+        { left_arrow: [?\e.ord, ?[.ord, ?D.ord] }
+      end
+      let(:alphabet_chars) do
+        ["a"].tap { |bytes| 256**256.times { bytes << bytes.last.succ } }
+      end
+      let(:bytes) { alphabet_chars.map(&:ord) }
+
+      it "returns the keycodes speedily" do
+        Timeout.timeout(0.5) do
+          parse
+        end
+      end
+
+    end
   end
 
 end
-
-
-__END__
-      @escape_codes = [?\e.ord]
-      @keys.merge!(
-        {
-          :up_arrow => [?\e.ord, ?[.ord, ?A.ord],
-          :down_arrow => [?\e.ord, ?[.ord, ?B.ord],
-          :right_arrow => [?\e.ord, ?[.ord, ?C.ord],
-          :left_arrow => [?\e.ord, ?[.ord, ?D.ord],
-          :insert => [?\e.ord, ?[, ?2.ord, ?~.ord],
-          :delete => [?\e.ord, ?[, ?3.ord, ?~.ord],
-          :backspace => [?\C-?.ord],
-          :enter => (HighLine::SystemExtensions::CHARACTER_MODE == 'termios' ? [?\n.ord] : [?\r.ord]),
-
-          :ctrl_alt_a => [?\e.ord, ?\C-a.ord],
