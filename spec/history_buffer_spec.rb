@@ -3,104 +3,223 @@
 require_relative "../lib/rawline/history_buffer.rb"
 
 describe RawLine::HistoryBuffer do
+  subject(:history) do
+    RawLine::HistoryBuffer.new(100)
+  end
+
   before do
-    @history = RawLine::HistoryBuffer.new(5)
+    @history = history
   end
 
-  it "instantiates an empty array when created" do
-    expect(@history.length).to eq(0)
+  describe '#duplicates' do
+    it 'allows duplicates by default' do
+      expect(history.duplicates).to be(true)
+    end
   end
 
-  it "allows items to be added to the history" do
-    @history.duplicates = false
-    @history << "line #1"
-    @history << "line #2"
-    @history << "line #3"
-    @history << "line #2"
-    expect(@history).to eq(["line #1",  "line #2", "line #3"])
-    @history.duplicates = true
-    @history << "line #3"
-    expect(@history).to eq(["line #1", "line #2", "line #3", "line #3"])
-    @history.exclude = lambda { |i| i.match(/line #[456]/) }
-    @history << "line #4"
-    @history << "line #5"
-    @history << "line #6"
-    expect(@history).to eq(["line #1", "line #2", "line #3", "line #3"])
+  describe '#length' do
+    it 'is empty when newly created' do
+      expect(history.empty?).to be(true)
+      expect(history.length).to eq(0)
+    end
   end
 
-  it "does not overflow" do
-    @history << "line #1"
-    @history << "line #2"
-    @history << "line #3"
-    @history << "line #4"
-    @history << "line #5"
-    @history << "line #6"
-    expect(@history.length).to eq(5)
+  describe '#<<' do
+    it 'appends the given item to the history' do
+      history << "line #1"
+      history << "line #2"
+      history << "line #2"
+      history << "line #3"
+      expect(history).to eq(['line #1', 'line #2', 'line #2', 'line #3'])
+    end
+
+    context 'and duplicates are disabled' do
+      before do
+        history.duplicates = false
+      end
+
+      it 'does not append a duplicate item' do
+        history << "line #1"
+        history << "line #1"
+        history << "line #1"
+        expect(history).to eq(['line #1'])
+      end
+
+      it 'allows duplicate item that are not next to each other in the history' do
+        history << "line #1"
+        history << "line #2"
+        history << "line #1"
+        expect(history).to eq(['line #1', 'line #2', 'line #1'])
+      end
+    end
+
+    context 'and there is an exclusion filter' do
+      before do
+        history.exclude = -> (i) { i.match(/line #[13]/) }
+      end
+
+      it 'does not append excluded items' do
+        history << "line #1"
+        history << "line #2"
+        history << "line #3"
+        history << "line #4"
+        expect(@history).to eq(['line #2', 'line #4'])
+      end
+    end
+
+    context 'and the history has a set size' do
+      subject(:history) { described_class.new(size) }
+      let(:size) { 2 }
+
+      it 'does not overflow' do
+        3.times { history << 'apples' }
+        expect(history).to eq(['apples', 'apples'])
+      end
+    end
   end
 
-  it "allows navigation back and forward" do
-    @history.back
-    @history.forward
-    expect(@history.position).to eq(nil)
-    @history << "line #1"
-    @history << "line #2"
-    @history << "line #3"
-    @history << "line #4"
-    @history << "line #5"
-    @history.back
-    @history.back
-    @history.back
-    @history.back
-    @history.back
-    expect(@history.position).to eq(0)
-    @history.back
-    expect(@history.position).to eq(0)
-    @history.forward
-    expect(@history.position).to eq(1)
-    @history.forward
-    @history.forward
-    @history.forward
-    @history.forward
-    expect(@history.position).to eq(4)
-    @history.forward
-    expect(@history.position).to eq(4)
-    @history.cycle = true
-    @history.forward
-    @history.forward
-    expect(@history.position).to eq(1)
+  describe 'navigating the history' do
+    before do
+      history << 'item 1'
+      history << 'item 2'
+      history << 'item 3'
+      history << 'item 4'
+      history << 'item 5'
+
+      expect(history.position).to be(nil)
+    end
+
+    describe '#back' do
+      it 'allows you to move back thru the history' do
+        history.back
+        expect(history.position).to be(4)
+        history.back
+        history.back
+        expect(history.position).to be(2)
+      end
+
+      it 'does not allow you to go past the very first item' do
+        100.times { history.back }
+        expect(history.position).to be(0)
+      end
+
+      context 'and the history is set to cycle' do
+        before { history.cycle = true }
+
+        it 'wraps around to the very last item when you move beyond the first item' do
+          history.position = 0
+          history.back
+          expect(history.position).to be(history.length - 1)
+        end
+      end
+    end
+
+    describe '#forward' do
+      context 'and you are starting with no position' do
+        before { expect(history.position).to be(nil) }
+
+        it 'puts you at the position of the last item' do
+          history.forward
+          expect(history.position).to eq(history.length - 1)
+        end
+      end
+
+      context 'and you are starting from a known position' do
+        before do
+          history.length.times { history.back }
+          expect(history.position).to be(0)
+        end
+
+        it 'allows you to move forward thru the history' do
+          history.forward
+          expect(history.position).to be(1)
+          history.forward
+          history.forward
+          expect(history.position).to be(3)
+        end
+      end
+
+      it 'does not allow you to go past the very last item (by default)' do
+        100.times { history.forward }
+        expect(history.position).to be(history.length - 1)
+      end
+
+      context 'and the history is set to cycle' do
+        before { history.cycle = true }
+
+        it 'wraps around to the very first item when you move beyond the last item' do
+          history.position = history.length - 2
+          history.forward
+          history.forward
+          expect(history.position).to be(0)
+        end
+      end
+    end
   end
 
-  it "can retrieve the last element or the element at @position via 'get'" do
-    expect(@history.get).to eq(nil)
-    @history << "line #1"
-    @history << "line #2"
-    @history << "line #3"
-    @history << "line #4"
-    @history << "line #5"
-    expect(@history.get).to eq("line #5")
-    @history.back
-    expect(@history.get).to eq("line #4")
-    @history.forward
-    expect(@history.get).to eq("line #5")
+  describe '#get' do
+    before do
+      history << 'item 1'
+      history << 'item 2'
+      history << 'item 3'
+    end
+
+    context 'and there is no position' do
+      before { expect(history.position).to be(nil) }
+
+      it 'returns the last item' do
+        expect(history.get).to eq('item 3')
+      end
+
+      it 'sets the position to that of the last item' do
+        expect do
+          history.get
+        end.to change { history.position }.to history.length - 1
+      end
+    end
+
+    context 'and there is a position' do
+      before { history.back }
+
+      it 'returns the item at the current position' do
+        expect(history.get).to eq('item 3')
+      end
+    end
   end
 
-  it "can be cleared and resized" do
-    @history << "line #1"
-    @history << "line #2"
-    @history << "line #3"
-    @history << "line #4"
-    @history << "line #5"
-    @history.back
-    @history.back
-    expect(@history.get).to eq("line #4")
-    @history.resize(6)
-    expect(@history.position).to eq(nil)
-    @history << "line #6"
-    expect(@history.get).to eq("line #6")
-    @history.empty
-    expect(@history).to eq([])
-    expect(@history.size).to eq(6)
-    expect(@history.position).to eq(nil)
+  describe '#resize' do
+    before do
+      history << 'item 1' << 'item 2' << 'item 3' << 'item 4'
+    end
+
+    it 'resizes the history' do
+      expect do
+        history.resize(2)
+      end.to change { history.size }.to 2
+    end
+
+    it 'forgets any history items older than the new size allows' do
+      expect do
+        history.resize(2)
+      end.to change { history }.to ['item 3', 'item 4']
+    end
+  end
+
+  describe '#clear' do
+    before { history << 'item 1' << 'item 2' }
+
+    it 'forgets all history items' do
+      expect do
+        history.clear
+      end.to change { history }.to []
+    end
+
+    it 'clears the position' do
+      history.forward
+      expect do
+        history.clear
+      end.to change { history.position }.to nil
+    end
   end
 
   describe 'finding matches in history, forward and backward' do

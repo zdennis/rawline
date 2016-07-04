@@ -18,8 +18,8 @@ module RawLine
   #
   class HistoryBuffer < Array
 
-    attr_reader :position, :size
-    attr_accessor :duplicates, :exclude, :cycle
+    attr_reader :size
+    attr_accessor :duplicates, :exclude, :cycle, :position
 
     #
     # Create an instance of RawLine::HistoryBuffer.
@@ -51,7 +51,7 @@ module RawLine
     #
     def resize(new_size)
       if new_size < @size
-        @size-new_size.times { pop }
+        @size-new_size.times { shift }
       end
       @size = new_size
       @position = nil
@@ -80,9 +80,9 @@ module RawLine
     #
     # Clear the content of the buffer and reset <tt>@position</tt> to nil.
     #
-    def empty
+    def clear
       @position = nil
-      clear
+      super
     end
 
     #
@@ -152,7 +152,7 @@ module RawLine
 
       case @position
       when nil then
-        @position = 0
+        @position = length - 1
       when length-1 then
         @position = 0 if @cycle
       else
@@ -164,9 +164,9 @@ module RawLine
     # Add a new item to the buffer.
     #
     def push(item)
-      if !@duplicates && include?(item)
+      if !@duplicates && last == item
         # skip adding this line
-        return
+        return self
       end
 
       unless @exclude.call(item)
@@ -179,6 +179,7 @@ module RawLine
         super(item)
         @position = nil
       end
+      self
     end
 
     alias << push

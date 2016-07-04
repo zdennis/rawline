@@ -15,7 +15,7 @@ module RawLine
         h.duplicates = false
         h.cycle = true
       end
-      @completion_matches.empty
+      @completion_matches.clear
 
       @first_time = true
       @word_start = @line.word[:start]
