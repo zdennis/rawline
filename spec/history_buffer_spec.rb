@@ -14,6 +14,15 @@ describe RawLine::HistoryBuffer do
     end
   end
 
+  describe '.new_with_infinite_size' do
+    let(:infinity) { 1.0 / 0.0 }
+    it 'returns a new HistoryBuffer of an infinite size' do
+      history = described_class.new_with_infinite_size
+      expect(history).to be_kind_of(described_class)
+      expect(history.size).to eq(infinity)
+    end
+  end
+
   describe '#[]' do
     before { history << 'foo' << 'bar' }
 
@@ -169,6 +178,25 @@ describe RawLine::HistoryBuffer do
 
     it 'returns nil when there are no history items' do
       expect(history.first).to be(nil)
+    end
+  end
+
+  describe '#first!' do
+    before do
+      history << 'item 1' << 'item 2' << 'item 3'
+      history.forward
+      history.forward
+      expect(history.beginning?).to be(false)
+    end
+
+    it 'sets the position to the beginning of the HistoryBuffer' do
+      history.first!
+      expect(history.beginning?).to be(true)
+      expect(history.position).to eq(0)
+    end
+
+    it 'returns the first history item' do
+      expect(history.first!).to eq('item 1')
     end
   end
 
@@ -542,7 +570,6 @@ describe RawLine::HistoryBuffer do
 
   describe '#reverse' do
     before { history << 'item 1' << 'item 2' }
-
 
     it 'returns a new HistoryBuffer in reverse order' do
       reversed_history = history.reverse

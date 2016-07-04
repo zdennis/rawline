@@ -18,6 +18,7 @@ module RawLine
   #
   class HistoryBuffer
     DefaultSize = 1024
+    Infinity = 1.0 / 0
 
     # +size+ is used to determine how many history items should be kept.
     attr_reader :size
@@ -35,6 +36,10 @@ module RawLine
 
     # +position+ can be used to set or get the current location of the history
     attr_accessor :position
+
+    def self.new_with_infinite_size(**kwargs)
+      new(Infinity, **kwargs)
+    end
 
     #
     # Create an instance of RawLine::HistoryBuffer.
@@ -169,6 +174,11 @@ module RawLine
 
     def first
       @history.first
+    end
+
+    def first!
+      @position = 0
+      get
     end
 
     #
