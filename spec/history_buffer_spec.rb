@@ -555,6 +555,22 @@ describe RawLine::HistoryBuffer do
     end
   end
 
+  describe '#size' do
+    it 'returns the size of the HistoryBuffer (regardless of history items)' do
+      expect(described_class.new(4).size).to eq(4)
+      expect(described_class.new(128).size).to eq(128)
+    end
+
+    it 'defaults to 1024 when provided as 0 or nil' do
+      expect(described_class.new(0).size).to eq(1024)
+      expect(described_class.new(nil).size).to eq(1024)
+    end
+
+    it 'defaults to 1024 when not provided' do
+      expect(described_class.new.size).to eq(1024)
+    end
+  end
+
   describe '#to_a' do
     it 'returns the history as an array' do
       history << 'item 1' << 'item 2'

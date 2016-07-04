@@ -17,6 +17,7 @@ module RawLine
   # as word completion matches.
   #
   class HistoryBuffer
+    DefaultSize = 1024
 
     # +size+ is used to determine how many history items should be kept.
     attr_reader :size
@@ -44,13 +45,13 @@ module RawLine
     # * <tt>exclude</tt> - a Proc object defining exclusion rules to prevent items from being added to the buffer.
     # * <tt>cycle</tt> - Whether or not the buffer is cyclic.
     #
-    def initialize(size, cycle: false, duplicates: true, exclude: nil)
+    def initialize(size=DefaultSize, cycle: false, duplicates: true, exclude: nil)
       @history = []
       @duplicates = duplicates
       @exclude = exclude || -> (item){ }
       @cycle = cycle
       yield self if block_given?
-      @size = size
+      @size = size && size > 0 ? size : DefaultSize
       @position = nil
     end
 
