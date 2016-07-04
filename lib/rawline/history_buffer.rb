@@ -107,6 +107,10 @@ module RawLine
       @history.length
     end
 
+    def each(&blk)
+      @history.each(&blk)
+    end
+
     # Return true if the history is empty, otherwise false.
     def empty?
       @history.empty?
@@ -210,6 +214,10 @@ module RawLine
     def last
       return nil unless @history.last
       @history.last.dup
+    end
+
+    def map(&blk)
+      @history.map(&blk)
     end
 
     #

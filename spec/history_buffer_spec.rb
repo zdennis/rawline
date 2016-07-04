@@ -100,6 +100,18 @@ describe RawLine::HistoryBuffer do
     end
   end
 
+  describe '#each' do
+    before { history << 'foo' << 'bar' << 'baz' }
+
+    it 'iterates over each item in the history, oldest to newest' do
+      results = []
+      history.each do |item|
+        results << item
+      end
+      expect(results).to eq ['foo', 'bar', 'baz']
+    end
+  end
+
   describe '#empty?' do
     it 'returns true when there are not history items' do
       expect(empty_history.empty?).to be(true)
@@ -447,6 +459,17 @@ describe RawLine::HistoryBuffer do
           end.to change { history.beginning? }.to true
         end
       end
+    end
+  end
+
+  describe '#map' do
+    before { history << 'foo' << 'bar' << 'baz' }
+
+    it 'iterates over each item in the history, oldest to newest' do
+      results = history.map do |item|
+        "echo #{item}"
+      end
+      expect(results).to eq ['echo foo', 'echo bar', 'echo baz']
     end
   end
 
