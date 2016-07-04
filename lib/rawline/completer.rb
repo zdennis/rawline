@@ -11,11 +11,10 @@ module RawLine
       @done_proc = done
       @keys = keys
 
-      @completion_matches = HistoryBuffer.new(0) do |h|
-        h.duplicates = false
-        h.cycle = true
-      end
-      @completion_matches.clear
+      @completion_matches = HistoryBuffer.new_with_infinite_size(
+        cycle: true,
+        duplicates: false
+      )
 
       @first_time = true
       @word_start = @line.word[:start]
@@ -30,7 +29,8 @@ module RawLine
 
       if @first_time
         matches = fetch_completions
-        resize(matches)
+        @completion_matches.replace(matches)
+        @completion_matches.first!
 
         if matches.length == 1
           handle_one_match
@@ -77,7 +77,7 @@ module RawLine
 
     def handle_one_match
       Treefell['editor'].puts "completer, exactly one possible completion found: #{@completion_matches.inspect}"
-      @completion_selected_proc.call(@completion_matches.first)
+      @completion_selected_proc.call(@completion_matches.get)
 
       Treefell['editor'].puts "completer, done"
       @done_proc.call
@@ -85,9 +85,6 @@ module RawLine
 
     def handle_more_than_one_match
       Treefell['editor'].puts "completer, more than one possible completion"
-
-      # Get first match
-      @completion_matches.forward
       match = @completion_matches.get
 
       Treefell['editor'].puts "completer: first completion: #{match} possible: #{@completion_matches.inspect}"
@@ -100,13 +97,6 @@ module RawLine
 
       Treefell['editor'].puts "completer, done"
       @done_proc.call
-    end
-
-    def resize(matches)
-      if matches.any?
-        @completion_matches.resize(matches.length)
-        matches.each { |w| @completion_matches << w }
-      end
     end
 
     def select_next
