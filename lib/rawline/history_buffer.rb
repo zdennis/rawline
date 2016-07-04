@@ -54,6 +54,10 @@ module RawLine
       @position = nil
     end
 
+    def [](index)
+      @history[index]
+    end
+
     def any?(&blk)
       @history.any?(&blk)
     end

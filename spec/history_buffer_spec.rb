@@ -14,6 +14,19 @@ describe RawLine::HistoryBuffer do
     end
   end
 
+  describe '#[]' do
+    before { history << 'foo' << 'bar' }
+
+    it 'returns the history item at the given index' do
+      expect(history[0]).to eq 'foo'
+      expect(history[1]).to eq 'bar'
+    end
+
+    it 'returns nil when there is no item at the index' do
+      expect(history[2]).to be(nil)
+    end
+  end
+
   describe '#any?' do
     it 'returns true when there is at least one item in the history' do
       history << 'item 1'
