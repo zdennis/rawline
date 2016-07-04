@@ -108,13 +108,6 @@ module RawLine
       @history.detect(&blk)
     end
 
-    #
-    # Returns the number of items in the HistoryBuffer.
-    #
-    def length
-      @history.length
-    end
-
     def each(&blk)
       @history.each(&blk)
     end
@@ -173,6 +166,10 @@ module RawLine
       end
     end
 
+    def first
+      @history.first
+    end
+
     #
     # Increment <tt>@position</tt>. By default the history will become
     # positioned at the next item.
@@ -222,6 +219,13 @@ module RawLine
     def last
       return nil unless @history.last
       @history.last.dup
+    end
+
+    #
+    # Returns the number of items in the HistoryBuffer.
+    #
+    def length
+      @history.length
     end
 
     def map(&blk)

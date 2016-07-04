@@ -161,6 +161,17 @@ describe RawLine::HistoryBuffer do
     end
   end
 
+  describe '#first' do
+    it 'returns the first history item' do
+      history << 'item 1' << 'item 2'
+      expect(history.first).to eq 'item 1'
+    end
+
+    it 'returns nil when there are no history items' do
+      expect(history.first).to be(nil)
+    end
+  end
+
   describe '#get' do
     before do
       history << 'item 1'
