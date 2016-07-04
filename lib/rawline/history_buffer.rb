@@ -16,96 +16,42 @@ module RawLine
   # The HistoryBuffer class is used to hold the editor and line histories, as well
   # as word completion matches.
   #
-  class HistoryBuffer < Array
+  class HistoryBuffer
 
+    # +size+ is used to determine how many history items should be kept.
     attr_reader :size
-    attr_accessor :duplicates, :exclude, :cycle, :position
+
+    # +duplicates+ is used to determine if the history can house duplicate \
+    # items, consecutively
+    attr_accessor :duplicates
+
+    # +exclude+ can be set to a lambda/proc filter to determine
+    # if an item should be excluded from the history
+    attr_accessor :exclude
+
+    # +cycle+ is used to determine if the the buffer is cyclic
+    attr_accessor :cycle
+
+    # +position+ can be used to set or get the current location of the history
+    attr_accessor :position
 
     #
     # Create an instance of RawLine::HistoryBuffer.
     # This method takes an optional block used to override the
-    # following instance attributes:
-    # * <tt>@duplicates</tt> - whether or not duplicate items will be stored in the buffer.
-    # * <tt>@exclude</tt> - a Proc object defining exclusion rules to prevent items from being added to the buffer.
-    # * <tt>@cycle</tt> - Whether or not the buffer is cyclic.
+    # following properties:
     #
-    def initialize(size)
-      @duplicates = true
-      @exclude = lambda{|a|}
-      @cycle = false
+    # * <tt>duplicates</tt> - whether or not duplicate items will be stored in the buffer.
+    # * <tt>exclude</tt> - a Proc object defining exclusion rules to prevent items from being added to the buffer.
+    # * <tt>cycle</tt> - Whether or not the buffer is cyclic.
+    #
+    def initialize(size, cycle: false, duplicates: true, exclude: nil)
+      @history = []
+      @duplicates = duplicates
+      @exclude = exclude || -> (item){ }
+      @cycle = cycle
       yield self if block_given?
       @size = size
       @position = nil
-    end
-
-    #
-    # Clears the current position on the history object. Useful when deciding
-    # to cancel/reset history navigation.
-    #
-    def clear_position
-      @position = nil
-    end
-
-    #
-    # Resize the buffer, resetting <tt>@position</tt> to nil.
-    #
-    def resize(new_size)
-      if new_size < @size
-        @size-new_size.times { shift }
-      end
-      @size = new_size
-      @position = nil
-    end
-
-    def find_match_backward(text)
-      regex = to_regex(text)
-      offset = @position ? length - position : 0
-      reverse[offset..-1].detect.with_index do |item, index|
-        if item.match(regex)
-          @position = length - index - (offset + 1)
-        end
-      end
-    end
-
-    def find_match_forward(text)
-      regex = to_regex(text)
-      offset = @position ? @position + 1 : 0
-      self[offset..-1].detect.with_index do |item, index|
-        if item.match(regex)
-          @position = index + offset
-        end
-      end
-    end
-
-    #
-    # Clear the content of the buffer and reset <tt>@position</tt> to nil.
-    #
-    def clear
-      @position = nil
-      super
-    end
-
-    #
-    # Retrieve a copy of the element at <tt>@position</tt>.
-    #
-    def get
-      return nil unless length > 0
-      @position = length-1 unless @position
-      at(@position).dup
-    end
-
-    #
-    # Return true if <tt>@position</tt> is at the end of the buffer.
-    #
-    def end?
-      @position == length-1
-    end
-
-    #
-    # Return true if <tt>@position</tt> is at the start of the buffer.
-    #
-    def start?
-      @position == 0
     end
 
     #
@@ -122,15 +68,90 @@ module RawLine
     # <tt>:history</tt> option will be a reference to self.
     #
     def back(options={})
-      return nil unless length > 0
+      return nil unless count > 0
 
       case @position
       when nil then
-        @position = length-1
+        @position = count - 1
       when 0 then
-        @position = length-1 if @cycle
+        @position = count - 1 if @cycle
       else
         @position -= 1
+      end
+    end
+
+    #
+    # Clear the content of the buffer and resets <tt>position</tt> to nil.
+    #
+    def clear
+      @position = nil
+      @history.clear
+    end
+
+    #
+    # Clears the current position on the history object. Useful when deciding
+    # to cancel/reset history navigation.
+    #
+    def clear_position
+      @position = nil
+    end
+
+    #
+    # Returns the number of items in the HistoryBuffer.
+    #
+    def count
+      @history.length
+    end
+
+    # Return true if the history is empty, otherwise false.
+    def empty?
+      @history.empty?
+    end
+
+    #
+    # Return true if <tt>@position</tt> is at the end of the buffer.
+    #
+    def end?
+      @position == count - 1
+    end
+
+    #
+    # Override equals check. Will be the same as another HistoryBuffer
+    # object with the same history items. Ignores position, exclusion filter,
+    # and so on.
+    #
+    def ==(other)
+      other.is_a?(self.class) &&
+        other.instance_variable_get(:@history) == @history
+    end
+
+    #
+    # Finds and returns the first item matching the given text, starting
+    # from the current <tt>position</tt>, moving backwards. The given text
+    # will be successfully matched if it matches any part of a history item.
+    #
+    def find_match_backward(text)
+      regex = to_regex(text)
+      offset = @position ? count - position : 0
+      @history.reverse[offset..-1].detect.with_index do |item, index|
+        if item.match(regex)
+          @position = count - index - (offset + 1)
+        end
+      end
+    end
+
+    #
+    # Finds and returns the first item matching the given text, starting
+    # from the current <tt>position</tt>, moving forwards. The given text
+    # will be successfully matched if it matches any part of a history item.
+    #
+    def find_match_forward(text)
+      regex = to_regex(text)
+      offset = @position ? @position + 1 : 0
+      @history[offset..-1].detect.with_index do |item, index|
+        if item.match(regex)
+          @position = index + offset
+        end
       end
     end
 
@@ -148,16 +169,41 @@ module RawLine
     # <tt>:history</tt> option will be a reference to self. If <tt>
     #
     def forward(options={})
-      return nil unless length > 0
+      return nil unless count > 0
 
       case @position
       when nil then
-        @position = length - 1
-      when length-1 then
+        @position = count - 1
+      when count-1 then
         @position = 0 if @cycle
       else
         @position += 1
       end
+    end
+
+    #
+    # Retrieve a copy of the history item at the current <tt>position</tt>.
+    #
+    def get
+      return nil unless count > 0
+      @position = count - 1 unless @position
+      @history.at(@position).dup
+    end
+
+    #
+    # Returns the index of the given item if it exists in the history,
+    # otherwise nil.
+    #
+    def index(item)
+      @history.index(item)
+    end
+
+    #
+    # Retrieve a copy of the last history item
+    #
+    def last
+      return nil unless @history.last
+      @history.last.dup
     end
 
     #
@@ -171,18 +217,43 @@ module RawLine
 
       unless @exclude.call(item)
         # Remove the oldest element if size is exceeded
-        if @size <= length
-          reverse!.pop
-          reverse!
+        if @size <= count
+          @history.reverse!.pop
+          @history.reverse!
         end
         # Add the new item and reset the position
-        super(item)
+        @history.push item
         @position = nil
       end
       self
     end
-
     alias << push
+
+    #
+    # Resize the buffer, resetting <tt>position</tt> to nil.
+    #
+    def resize(new_size)
+      if new_size < count
+        (count - new_size).times { @history.shift }
+      end
+      @size = new_size
+      @position = nil
+      self
+    end
+
+    #
+    # Return true if <tt>position</tt> is at the start of the buffer.
+    #
+    def beginning?
+      @position == 0
+    end
+
+    #
+    # Returns a copy of the HistoryBuffer as an array.
+    #
+    def to_a
+      @history.dup
+    end
 
     private
 
