@@ -217,7 +217,6 @@ describe RawLine::HistoryBuffer do
         it 'can find consecutive matches, skipping unmatched items' do
           history.clear_position
           expect(history.find_match_backward('foo')).to eq 'echo food'
-          $z = true
           expect(history.find_match_backward('foo')).to eq 'echo foo'
         end
       end
@@ -226,6 +225,40 @@ describe RawLine::HistoryBuffer do
         it 'finds the first item back that matches from the current position' do
           3.times { history.back }
           expect(history.find_match_backward('bar')).to eq 'echo bar'
+        end
+      end
+
+      context 'when the HistoryBuffer is not cyclic' do
+        before { history.cycle = false }
+
+        it 'stops searching at the very first item in the HistoryBuffer' do
+          history.find_match_backward('echo foo')
+          expect(history.get).to eq('echo food')
+
+          history.find_match_backward('echo foo')
+          expect(history.get).to eq('echo foo')
+          expect(history.beginning?).to be(true)
+
+          history.find_match_backward('echo foo')
+          expect(history.get).to eq('echo foo')
+          expect(history.beginning?).to be(true)
+        end
+      end
+
+      context 'when the HistoryBuffer is cyclic' do
+        before { history.cycle = true }
+
+        it 'wraps aorund and searches from the end of hte HistoryBuffer' do
+          history.find_match_backward('echo foo')
+          expect(history.get).to eq('echo food')
+
+          history.find_match_backward('echo foo')
+          expect(history.get).to eq('echo foo')
+          expect(history.beginning?).to be(true)
+
+          history.find_match_backward('echo foo')
+          expect(history.get).to eq('echo food')
+          expect(history.beginning?).to be(false)
         end
       end
     end
@@ -268,6 +301,45 @@ describe RawLine::HistoryBuffer do
           expect(history.find_match_forward('bar')).to eq 'echo bark'
         end
       end
+
+      context 'when the HistoryBuffer is not cyclic' do
+        before do
+          history.cycle = false
+          history.position = 0
+        end
+
+        it 'stops searching at the very last item matched in the HistoryBuffer' do
+          history.find_match_forward('echo b')
+          history.find_match_forward('echo b')
+          history.find_match_forward('echo b')
+          expect(history.get).to eq('echo bark')
+
+          history.find_match_forward('echo b')
+          expect(history.get).to eq('echo bonanza')
+          expect(history.end?).to be(true)
+
+          history.find_match_forward('echo b')
+          expect(history.end?).to be(true)
+        end
+      end
+
+      context 'when the HistoryBuffer is cyclic' do
+        before { history.cycle = true }
+
+        it 'wraps aorund and searches from the end of hte HistoryBuffer' do
+          history.find_match_forward('echo b')
+          history.find_match_forward('echo b')
+          history.find_match_forward('echo b')
+          expect(history.get).to eq('echo bark')
+          history.find_match_forward('echo b')
+          expect(history.get).to eq('echo bonanza')
+          expect(history.end?).to be(true)
+
+          history.find_match_forward('echo bar')
+          expect(history.end?).to be(false)
+        end
+      end
+
     end
   end
 

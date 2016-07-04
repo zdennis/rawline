@@ -132,6 +132,7 @@ module RawLine
     #
     def find_match_backward(text)
       regex = to_regex(text)
+      @position = nil if @position == 0 && @cycle
       offset = @position ? count - position : 0
       @history.reverse[offset..-1].detect.with_index do |item, index|
         if item.match(regex)
@@ -147,6 +148,7 @@ module RawLine
     #
     def find_match_forward(text)
       regex = to_regex(text)
+      @position = -1 if @position == count - 1 && @cycle
       offset = @position ? @position + 1 : 0
       @history[offset..-1].detect.with_index do |item, index|
         if item.match(regex)
