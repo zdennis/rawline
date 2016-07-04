@@ -14,6 +14,29 @@ describe RawLine::HistoryBuffer do
     end
   end
 
+  describe '#any?' do
+    it 'returns true when there is at least one item in the history' do
+      history << 'item 1'
+      expect(history.any?).to be(true)
+    end
+
+    it 'returns false otherwise' do
+      expect(history.any?).to be(false)
+    end
+
+    context 'called with a block' do
+      before { history << 'item 1' << 'item 2' }
+
+      it 'returns true the block returns true for any item in the history' do
+        expect(history.any?{ |item| item =~ /1/ }).to be(true)
+      end
+
+      it 'returns false otherwise' do
+        expect(history.any?{ |item| item =~ /z/ }).to be(false)
+      end
+    end
+  end
+
   describe '#beginning?' do
     before do
       history << 'item 1' << 'item 2'
@@ -427,6 +450,21 @@ describe RawLine::HistoryBuffer do
     end
   end
 
+  describe '#replace' do
+    before { history << 'item 1' << 'item 2' }
+
+    it 'replaces the current history items with an array of history items' do
+      history.replace(['foo', 'bar'])
+      expect(history).to eq build_history('foo', 'bar')
+    end
+
+    it 'replaces the current history items with a given HistoryBuffer' do
+      new_history = build_history('foo', 'bar')
+      history.replace(new_history)
+      expect(history).to eq new_history
+    end
+  end
+
   describe '#resize' do
     before do
       history << 'item 1' << 'item 2' << 'item 3' << 'item 4'
@@ -441,6 +479,21 @@ describe RawLine::HistoryBuffer do
     it 'forgets any history items older than the new size allows' do
       history.resize(2)
       expect(history).to eq build_history('item 3', 'item 4')
+    end
+  end
+
+  describe '#reverse' do
+    before { history << 'item 1' << 'item 2' }
+
+
+    it 'returns a new HistoryBuffer in reverse order' do
+      reversed_history = history.reverse
+      expect(reversed_history).to eq build_history('item 2', 'item 1');
+    end
+
+    it 'does not modify the original HistoryBuffer' do
+      reversed_history = history.reverse
+      expect(history).to eq build_history('item 1', 'item 2')
     end
   end
 

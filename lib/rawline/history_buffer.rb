@@ -54,6 +54,10 @@ module RawLine
       @position = nil
     end
 
+    def any?(&blk)
+      @history.any?(&blk)
+    end
+
     #
     # Decrement <tt>@position</tt>. By default the history will become
     # positioned at the previous item.
@@ -232,6 +236,17 @@ module RawLine
     alias << push
 
     #
+    # Replaces the current history with the given <tt>new_history</tt>. The
+    # new_history can be given as an array of history items or a HistoryBuffer
+    # object.
+    def replace(new_history)
+      if new_history.is_a?(HistoryBuffer)
+        new_history = new_history.instance_variable_get(:@history)
+      end
+      @history.replace(new_history)
+    end
+
+    #
     # Resize the buffer, resetting <tt>position</tt> to nil.
     #
     def resize(new_size)
@@ -241,6 +256,14 @@ module RawLine
       @size = new_size
       @position = nil
       self
+    end
+
+    def reverse
+      self.class.new(size).tap do |new_history|
+        @history.reverse.each do |item|
+          new_history << item
+        end
+      end
     end
 
     #
