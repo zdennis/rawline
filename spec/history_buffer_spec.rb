@@ -87,10 +87,14 @@ describe RawLine::HistoryBuffer do
     end
   end
 
-  describe '#count' do
-    it 'is empty when newly created' do
-      expect(history.empty?).to be(true)
-      expect(history.count).to eq(0)
+  describe '#detect' do
+    before { history << 'item 1' << 'item 2' << 'item 22' }
+    it 'returns the first item that matches the given block' do
+      expect(history.detect { |item| item =~ /2/ }).to eq('item 2')
+    end
+
+    it 'returns nil when there is no matching item' do
+      expect(history.detect { |item| item =~ /z/ }).to be(nil)
     end
   end
 
@@ -161,7 +165,7 @@ describe RawLine::HistoryBuffer do
       it 'sets the position to that of the last item' do
         expect do
           history.get
-        end.to change { history.position }.to history.count - 1
+        end.to change { history.position }.to history.length - 1
       end
     end
 
@@ -171,6 +175,13 @@ describe RawLine::HistoryBuffer do
       it 'returns the item at the current position' do
         expect(history.get).to eq('item 3')
       end
+    end
+  end
+
+  describe '#length' do
+    it 'is empty when newly created' do
+      expect(history.empty?).to be(true)
+      expect(history.length).to eq(0)
     end
   end
 
@@ -330,7 +341,7 @@ describe RawLine::HistoryBuffer do
 
       context 'when its gone all the way back, and we want to go forward' do
         it 'finds the first item forward that matches from the current position' do
-          history.count.times do
+          history.length.times do
             history.find_match_backward('bar')
           end
           expect(history.find_match_forward('bar')).to eq 'echo bark'
@@ -428,7 +439,7 @@ describe RawLine::HistoryBuffer do
 
       context 'and you are starting from a known position' do
         before do
-          history.count.times { history.back }
+          history.length.times { history.back }
           expect(history.position).to be(0)
         end
 
@@ -452,7 +463,7 @@ describe RawLine::HistoryBuffer do
         before { history.cycle = true }
 
         it 'wraps around to the very first item when you move beyond the last item' do
-          history.position = history.count - 2
+          history.position = history.length - 2
           history.forward
           expect do
             history.forward

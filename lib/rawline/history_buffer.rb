@@ -72,13 +72,13 @@ module RawLine
     # <tt>:history</tt> option will be a reference to self.
     #
     def back(options={})
-      return nil unless count > 0
+      return nil unless length > 0
 
       case @position
       when nil then
-        @position = count - 1
+        @position = length - 1
       when 0 then
-        @position = count - 1 if @cycle
+        @position = length - 1 if @cycle
       else
         @position -= 1
       end
@@ -100,10 +100,14 @@ module RawLine
       @position = nil
     end
 
+    def detect(&blk)
+      @history.detect(&blk)
+    end
+
     #
     # Returns the number of items in the HistoryBuffer.
     #
-    def count
+    def length
       @history.length
     end
 
@@ -120,7 +124,7 @@ module RawLine
     # Return true if <tt>@position</tt> is at the end of the buffer.
     #
     def end?
-      @position == count - 1
+      @position == length - 1
     end
 
     #
@@ -141,10 +145,10 @@ module RawLine
     def find_match_backward(text)
       regex = to_regex(text)
       @position = nil if @position == 0 && @cycle
-      offset = @position ? count - position : 0
+      offset = @position ? length - position : 0
       @history.reverse[offset..-1].detect.with_index do |item, index|
         if item.match(regex)
-          @position = count - index - (offset + 1)
+          @position = length - index - (offset + 1)
         end
       end
     end
@@ -156,7 +160,7 @@ module RawLine
     #
     def find_match_forward(text)
       regex = to_regex(text)
-      @position = -1 if @position == count - 1 && @cycle
+      @position = -1 if @position == length - 1 && @cycle
       offset = @position ? @position + 1 : 0
       @history[offset..-1].detect.with_index do |item, index|
         if item.match(regex)
@@ -179,12 +183,12 @@ module RawLine
     # <tt>:history</tt> option will be a reference to self. If <tt>
     #
     def forward(options={})
-      return nil unless count > 0
+      return nil unless length > 0
 
       case @position
       when nil then
-        @position = count - 1
-      when count-1 then
+        @position = length - 1
+      when length-1 then
         @position = 0 if @cycle
       else
         @position += 1
@@ -195,8 +199,8 @@ module RawLine
     # Retrieve a copy of the history item at the current <tt>position</tt>.
     #
     def get
-      return nil unless count > 0
-      @position = count - 1 unless @position
+      return nil unless length > 0
+      @position = length - 1 unless @position
       @history.at(@position).dup
     end
 
@@ -231,7 +235,7 @@ module RawLine
 
       unless @exclude.call(item)
         # Remove the oldest element if size is exceeded
-        if @size <= count
+        if @size <= length
           @history.reverse!.pop
           @history.reverse!
         end
@@ -258,8 +262,8 @@ module RawLine
     # Resize the buffer, resetting <tt>position</tt> to nil.
     #
     def resize(new_size)
-      if new_size < count
-        (count - new_size).times { @history.shift }
+      if new_size < length
+        (length - new_size).times { @history.shift }
       end
       @size = new_size
       @position = nil
