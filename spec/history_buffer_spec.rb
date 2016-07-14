@@ -303,26 +303,34 @@ describe RawLine::HistoryBuffer do
     end
 
     describe '#find_match_backward' do
+      it 'finds the first item back whose start matches' do
+        expect(history.find_match_backward('echo b')).to eq 'echo bonanza'
+      end
+
+      it 'does not find partial matches' do
+        expect(history.find_match_backward('bonanza')).to be nil
+      end
+
       context 'when the position starts as nil' do
-        it 'finds the first item back that matches' do
+        it 'finds the first item back whose start matches' do
           history.clear_position
-          expect(history.find_match_backward('bonanza')).to eq 'echo bonanza'
+          expect(history.find_match_backward('echo b')).to eq 'echo bonanza'
 
           history.clear_position
-          expect(history.find_match_backward('foo')).to eq 'echo food'
+          expect(history.find_match_backward('echo f')).to eq 'echo food'
         end
 
         it 'can find consecutive matches, skipping unmatched items' do
           history.clear_position
-          expect(history.find_match_backward('foo')).to eq 'echo food'
-          expect(history.find_match_backward('foo')).to eq 'echo foo'
+          expect(history.find_match_backward('echo f')).to eq 'echo food'
+          expect(history.find_match_backward('echo f')).to eq 'echo foo'
         end
       end
 
       context 'when the position starts as non-nil' do
         it 'finds the first item back that matches from the current position' do
           3.times { history.back }
-          expect(history.find_match_backward('bar')).to eq 'echo bar'
+          expect(history.find_match_backward('echo b')).to eq 'echo baz'
         end
       end
 
@@ -362,23 +370,31 @@ describe RawLine::HistoryBuffer do
     end
 
     describe '#find_match_forward' do
+      it 'finds the first item forward whose start matches' do
+        expect(history.find_match_forward('echo b')).to eq 'echo bar'
+      end
+
+      it 'does not find partial matches' do
+        expect(history.find_match_forward('bonanza')).to be nil
+      end
+
       context 'when the position starts as nil' do
         it 'finds the first item from the beginning that matches' do
           history.clear_position
-          expect(history.find_match_forward('bar')).to eq 'echo bar'
+          expect(history.find_match_forward('echo b')).to eq 'echo bar'
           expect(history.position).to eq history.index('echo bar')
 
           history.clear_position
-          expect(history.find_match_forward('foo')).to eq 'echo foo'
+          expect(history.find_match_forward('echo f')).to eq 'echo foo'
           expect(history.position).to eq history.index('echo foo')
         end
 
         it 'can find consecutive matches, skipping unmatched items' do
           history.clear_position
-          expect(history.find_match_forward('foo')).to eq 'echo foo'
+          expect(history.find_match_forward('echo f')).to eq 'echo foo'
           expect(history.position).to eq history.index('echo foo')
 
-          expect(history.find_match_forward('foo')).to eq 'echo food'
+          expect(history.find_match_forward('echo f')).to eq 'echo food'
           expect(history.position).to eq history.index('echo food')
         end
       end
@@ -386,7 +402,7 @@ describe RawLine::HistoryBuffer do
       context 'when the position starts as non-nil' do
         it 'finds the first item back that matches from the current position' do
           3.times { history.back }
-          expect(history.find_match_forward('bar')).to eq 'echo bark'
+          expect(history.find_match_forward('echo b')).to eq 'echo bark'
           expect(history.position).to eq history.index('echo bark')
         end
       end
@@ -394,9 +410,9 @@ describe RawLine::HistoryBuffer do
       context 'when its gone all the way back, and we want to go forward' do
         it 'finds the first item forward that matches from the current position' do
           history.length.times do
-            history.find_match_backward('bar')
+            history.find_match_backward('echo bar')
           end
-          expect(history.find_match_forward('bar')).to eq 'echo bark'
+          expect(history.find_match_forward('echo bar')).to eq 'echo bark'
         end
       end
 

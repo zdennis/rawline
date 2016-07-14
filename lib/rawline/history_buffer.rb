@@ -146,11 +146,10 @@ module RawLine
     # will be successfully matched if it matches any part of a history item.
     #
     def find_match_backward(text)
-      regex = to_regex(text)
       @position = nil if @position == 0 && @cycle
       offset = @position ? length - position : 0
       @history.reverse[offset..-1].detect.with_index do |item, index|
-        if item.match(regex)
+        if item.start_with?(text)
           @position = length - index - (offset + 1)
         end
       end
@@ -162,11 +161,10 @@ module RawLine
     # will be successfully matched if it matches any part of a history item.
     #
     def find_match_forward(text)
-      regex = to_regex(text)
       @position = -1 if @position == length - 1 && @cycle
       offset = @position ? @position + 1 : 0
       @history[offset..-1].detect.with_index do |item, index|
-        if item.match(regex)
+        if item.start_with?(text)
           @position = index + offset
         end
       end
@@ -309,13 +307,6 @@ module RawLine
     #
     def to_a
       @history.dup
-    end
-
-    private
-
-    def to_regex(text)
-      return text if text.is_a?(Regexp)
-      /#{Regexp.escape(text)}/
     end
   end
 
