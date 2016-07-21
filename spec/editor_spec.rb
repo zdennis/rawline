@@ -118,8 +118,9 @@ describe RawLine::Editor do
     end
 
     it 'does not bubble up key bindings by default' do
-      custom_env = @editor.new_env(keyboard_input_processors: [input_processor])
-      @editor.push_env custom_env
+      @editor.push_new_env do |env|
+        env.keyboard_input_processor = input_processor
+      end
 
       input << ?\C-e
       input.rewind
@@ -128,8 +129,9 @@ describe RawLine::Editor do
     end
 
     it 'bubbles up key bindings when told to do so' do
-      custom_env = @editor.new_env(key_bindings_fall_back_to_parent: true)
-      @editor.push_env custom_env
+      @editor.push_new_env do |env|
+        env.key_bindings_fall_back_to_parent = true
+      end
 
       input << ?\C-e
       input.rewind
@@ -138,10 +140,8 @@ describe RawLine::Editor do
     end
 
     it 'bubbles up multiple environments' do
-      custom_envs = []
       3.times do
-        custom_envs << @editor.new_env(key_bindings_fall_back_to_parent: true)
-        @editor.push_env custom_envs.last
+        @editor.push_new_env(key_bindings_fall_back_to_parent: true)
       end
 
       input << ?\C-e
@@ -153,8 +153,7 @@ describe RawLine::Editor do
     it 'stops at the first binding found' do
       custom_envs = []
       3.times do
-        custom_envs << @editor.new_env(key_bindings_fall_back_to_parent: true)
-        @editor.push_env custom_envs.last
+        custom_envs << @editor.push_new_env(key_bindings_fall_back_to_parent: true)
       end
       custom_envs[1].bind(?\C-e) { @editor.write "what up doc?" }
 
@@ -165,18 +164,6 @@ describe RawLine::Editor do
       expect(@editor.line.text).to_not match "echo hi"
     end
   end
-
-  # it "can bubble up key bindings" do
-  #   @editor.bind(?\C-e) { @editor.write "echo hi" }
-  #   custom_env = @editor.new_env(key_bindings_fall_back_to_parent: true)
-  #   @editor.push_env custom_env
-  #
-  #   input << ?\C-e
-  #   input.rewind
-  #   @editor.event_loop.tick
-  #   # binding.pry
-  #   expect(@editor.line.text).to eq("echo hi")
-  # end
 
   it "keeps track of the cursor position" do
     input << "test #4"
