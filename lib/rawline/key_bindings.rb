@@ -55,7 +55,7 @@ module RawLine
       else
         raise BindingException, "Unable to bind '#{key.to_s}' (#{key.class.to_s})"
       end
-      @terminal.update
+      update_terminal
     end
 
     def bound?(char)
@@ -81,7 +81,7 @@ module RawLine
           raise BindingException, "Cannot bind more than one key or key sequence at once" unless key.values.length == 1
           bind_hash(key, -> { })
         end
-      @terminal.update
+      update_terminal
       block
     end
 
@@ -104,6 +104,10 @@ module RawLine
         @terminal.keys[j] = code
         keys[code] = block
       end
+    end
+
+    def update_terminal
+      @terminal.update if @terminal
     end
   end
 end
