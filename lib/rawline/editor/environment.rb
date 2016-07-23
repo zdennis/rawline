@@ -3,7 +3,6 @@ module RawLine
     class Environment
       attr_accessor :keys, :completion_class, :history, :word_separator
       attr_accessor :key_bindings_fall_back_to_parent
-      attr_accessor :keyboard_input_processors
       attr_accessor :parent_env
       attr_accessor :terminal
 
@@ -17,7 +16,6 @@ module RawLine
         @keys = KeyBindings.new(terminal: terminal)
 
         @keyboard_input_processors = keyboard_input_processors
-        @keyboard_input_processors << self
 
         @completion_class = Completer
 
@@ -59,18 +57,32 @@ module RawLine
         key_binding_for_bytes[bytes] ? true : false
       end
 
-      def keyboard_input_processor=(processor)
+      def keyboard_input_processor
+        self
+      end
+
+      def push_keyboard_input_processor(processor)
         @keyboard_input_processors.push processor
       end
 
+      def pop_keyboard_input_processor
+        @keyboard_input_processors.pop
+      end
+
       def read_bytes(bytes)
-        if @keyboard_input_processors == [self]
-          @parent_env.read_bytes(bytes) if @parent_env
-        else
-          @keyboard_input_processors.reverse.detect do |processor|
-            processor != self
-          end.read_bytes(bytes)
+        leftover_bytes = bytes
+
+        # go thru most recent process first
+        @keyboard_input_processors.reverse.map do |processor|
+          leftover_bytes = processor.read_bytes(bytes)
+          break if leftover_bytes.nil? || leftover_bytes.empty?
         end
+
+        if leftover_bytes && leftover_bytes.any? && @key_bindings_fall_back_to_parent && @parent_env
+          leftover_bytes = @parent_env.read_bytes(bytes)
+        end
+
+        nil
       end
     end
   end

@@ -21,7 +21,7 @@ module RawLine
     end
 
     def read_bytes(bytes)
-      return unless bytes.any?
+      return [] unless bytes.any?
 
       # this is to prevent a series of bytes from coming in at one time
       # E.g. holding down the tab key or arrow keys
@@ -49,8 +49,10 @@ module RawLine
         select_next
       else
         Treefell['editor'].puts "completer, done with leftover bytes: #{bytes.inspect}"
-        @done_proc.call(bytes)
+        @done_proc.call
+        return bytes
       end
+      []
     end
 
     private

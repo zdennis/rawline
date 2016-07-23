@@ -43,6 +43,7 @@ class DummyKeyboardInputProcessor
 
   def read_bytes(bytes)
     @bytes_read.push *bytes
+    []
   end
 end
 
@@ -119,7 +120,7 @@ describe RawLine::Editor do
 
     it 'does not bubble up key bindings by default' do
       @editor.push_new_env do |env|
-        env.keyboard_input_processor = input_processor
+        env.push_keyboard_input_processor input_processor
       end
 
       input << ?\C-e

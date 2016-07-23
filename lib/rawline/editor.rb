@@ -105,7 +105,10 @@ module RawLine
       @renderer = renderer
       @terminal = terminal
 
-      @env_stack = [Environment.new(terminal: terminal)]
+      @env_stack = []
+      push_new_env(terminal: terminal) do |env|
+        env.push_keyboard_input_processor self
+      end
 
       @word_break_characters = " \t\n\"'@><=;|&{()}"
       @mode = :insert
@@ -115,7 +118,7 @@ module RawLine
       @match_hidden_files = false
       set_default_keys
       @add_history = false
-      push_keyboard_input_processor self
+       self
       yield self if block_given?
       update_word_separator
       @char = nil
@@ -138,9 +141,9 @@ module RawLine
     end
     def push_env(env) ; @env_stack.push env ; end
     def pop_env ; @env_stack.pop ; end
-    def keyboard_input_processor ; env.keyboard_input_processors.last ; end
-    def push_keyboard_input_processor(kip) ; env.keyboard_input_processors.push kip ; end
-    def pop_keyboard_input_processor ; env.keyboard_input_processors.pop ; end
+    def keyboard_input_processor ; env.keyboard_input_processor ; end
+    def push_keyboard_input_processor(kip) ; env.push_keyboard_input_processor kip ; end
+    def pop_keyboard_input_processor ; env.pop_keyboard_input_processor ; end
 
     def completion_class ; @env_stack.first.completion_class ; end
     def history ; @env_stack.first.history ; end
@@ -251,6 +254,7 @@ module RawLine
           end
         end
       end
+      []
     end
 
     def process_line
@@ -583,19 +587,17 @@ module RawLine
         completion_selected: -> (completion) {
           completion_selected(completion)
         },
-        done: -> (*leftover_bytes){
+        done: -> {
           completion_done
-          leftover_bytes = leftover_bytes.flatten
-          pop_keyboard_input_processor
-          if leftover_bytes.any?
-            keyboard_input_processor.read_bytes(leftover_bytes)
-          end
           focused_input_box.cursor_on
+          pop_env
         },
         keys: terminal.keys
       )
-      push_keyboard_input_processor(completer)
-      completer.read_bytes(@char)
+      push_new_env do |env|
+        env.key_bindings_fall_back_to_parent = true
+        env.push_keyboard_input_processor completer
+      end.read_bytes(@char)
     end
 
     def completion_found(completion:, possible_completions:)
