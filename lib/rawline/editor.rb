@@ -16,7 +16,7 @@ require 'term/ansicolor'
 require 'fcntl'
 
 require 'rawline/editor/environment'
-require 'rawline/editor/modes'
+require 'rawline/modes'
 
 module RawLine
 
@@ -48,7 +48,6 @@ module RawLine
     attr_accessor :terminal, :mode
     attr_accessor :completion_proc, :line, :history
     attr_accessor :match_hidden_files
-    attr_accessor :word_break_characters
     attr_accessor :dom
 
     # TODO: dom traversal for lookup rather than assignment
@@ -95,8 +94,6 @@ module RawLine
     # to read from input and perform line-editing operations.
     # This method takes an optional block used to override the
     # following instance attributes:
-    # * <tt>@word_break_characters</tt> - a regex used for word separation, default inclues: " \t\n\"\\'`@$><=;|&{("
-    # * <tt>@mode</tt> - The editor's character insertion mode (:insert).
     # * <tt>@completion_proc</tt> - a Proc object used to perform word completion.
     # * <tt>@terminal</tt> -  a RawLine::Terminal containing character key codes.
     #
@@ -106,55 +103,79 @@ module RawLine
       @renderer = renderer
       @terminal = terminal
 
-      @modes = []
+      @registered_mode_types = {}
       @active_major_modes = []
       @active_minor_modes = []
 
-
-
-      @env_stack = []
-      push_new_env(terminal: terminal) do |env|
-        env.push_keyboard_input_processor self
-      end
-
-      @word_break_characters = " \t\n\"'@><=;|&{()}"
-      @mode = :insert
+      register_mode Modes::NormalMode
+      activate_mode Modes::NormalMode.name
+      @normal_mode = current_mode
 
       @completion_proc = filename_completion_proc
 
       @match_hidden_files = false
       set_default_keys
       @add_history = false
-       self
       yield self if block_given?
-      update_word_separator
-      @char = nil
 
       initialize_events
       initialize_line
     end
 
     attr_reader :dom, :event_loop, :input
-    attr_reader :keyboard_input_processors
 
-    def env ; @env_stack.last ; end
-    def new_env(**kwargs, &blk)
-      new_env = Environment.new **kwargs.merge(parent_env: env)
-      yield new_env if block_given?
-      new_env
+    def activate_mode(name)
+      mode_type = @registered_mode_types.fetch(name, "Unknown mode type with name #{name.inspect}")
+      if mode_type.major_mode?
+        mode_instance = mode_type.new(previous: current_mode)
+        if current_mode
+          deactivate_mode current_mode.class.name
+        end
+        mode_instance.activate(self)
+        @active_major_modes << mode_instance
+      else
+        mode_instance.activate(self)
+        @active_minor_modes << mode_instance
+      end
     end
-    def push_new_env(**kwargs, &blk)
-      new_env(**kwargs, &blk).tap { |env| push_env(env) }
-    end
-    def push_env(env) ; @env_stack.push env ; end
-    def pop_env ; @env_stack.pop ; end
-    def keyboard_input_processor ; env.keyboard_input_processor ; end
-    def push_keyboard_input_processor(kip) ; env.push_keyboard_input_processor kip ; end
-    def pop_keyboard_input_processor ; env.pop_keyboard_input_processor ; end
 
-    def completion_class ; @env_stack.first.completion_class ; end
-    def history ; @env_stack.first.history ; end
-    def keys ; @env_stack.first.keys ; end
+    def deactivate_mode(name)
+      mode_type = @registered_mode_types.fetch(name, "Unknown mode type with name #{name.inspect}")
+      if mode_type.major_mode?
+        mode = @active_major_modes.last
+        if mode.last.is_a?(mode_type)
+          @active_major_modes.pop
+          mode.deactivate(self)
+        else
+          fail "Trying to deactivate #{name.inspect} major mode, but it is not active."
+        end
+      else
+        mode = @active_minor_modes.detect { |mode| mode.s_a?(mode_type) }
+        mode || fail("Trying to deactivate #{name.inspect} minor mode, but it is not active")
+        @active_minor_modes.delete(mode)
+        mode.deactivate(self)
+      end
+    end
+
+    def current_mode
+      @active_major_modes.last
+    end
+
+    def register_mode(mode_klass)
+      @registered_mode_types[mode_klass.name] = mode_klass
+    end
+
+    def env
+      @normal_mode.env
+    end
+
+    def completion_class
+      @normal_mode.env.completion_class
+    end
+
+    def history
+      @normal_mode.env.history
+    end
 
     #
     # Return the current RawLine version
@@ -233,68 +254,54 @@ module RawLine
 
     def check_for_keyboard_input
       bytes = @input.read
-      if bytes.any?
-        keyboard_input_processor.read_bytes(bytes)
-      end
+      current_mode.read_bytes(bytes) if bytes.any?
       @event_loop.add_event name: 'check_for_keyboard_input'
     end
 
-    def read_bytes(bytes)
-      return unless bytes.any?
-
-      Treefell['editor'].puts "read_bytes #{bytes.inspect}"
-      old_position = @line.position
-
-      key_code_sequences = parse_key_code_sequences(bytes)
-
-      Treefell['editor'].puts "key code sequences: #{key_code_sequences.inspect}"
-      begin
-        key_code_sequences.each do |sequence|
-          @char = sequence
-          if @char == @terminal.keys[:enter] || !@char
-            Treefell['editor'].puts "processing line: #{@line.text.inspect}"
-
-            @renderer.rollup { process_line }
-          else
-            process_character
-            new_position = @line.position
-          end
-        end
-      end
-      []
-    end
+    # def read_bytes(bytes)
+    #   return unless bytes.any?
+    #
+    #   Treefell['editor'].puts "read_bytes #{bytes.inspect}"
+    #   old_position = @line.position
+    #
+    #   key_code_sequences = parse_key_code_sequences(bytes)
+    #
+    #   Treefell['editor'].puts "key code sequences: #{key_code_sequences.inspect}"
+    #   begin
+    #     key_code_sequences.each do |sequence|
+    #       @char = sequence
+    #       if @char == @terminal.keys[:enter] || !@char
+    #         Treefell['editor'].puts "processing line: #{@line.text.inspect}"
+    #
+    #         @renderer.rollup { process_line }
+    #       else
+    #         process_character
+    #         new_position = @line.position
+    #       end
+    #     end
+    #   end
+    #   []
+    # end
 
     def process_line
-      @event_loop.immediately(name: "process_line") do
-        add_to_history
+      @renderer.rollup do
+        @event_loop.immediately(name: "process_line") do
+          add_to_history
 
-        @terminal.snapshot_tty_attrs
-        @terminal.pseudo_cooked!
+          @terminal.snapshot_tty_attrs
+          @terminal.pseudo_cooked!
 
-        @terminal.move_to_beginning_of_row
-        @terminal.puts
-      end
-      @event_loop.immediately(name: "line_read", payload: { line: @line.text.without_ansi.dup })
-      @event_loop.immediately(name: "prepare_new_line") do
-        history.clear_position
-        reset_line
-        move_to_beginning_of_input
-      end
-      @event_loop.immediately(name: "restore_tty_attrs") { @terminal.restore_tty_attrs }
-      @event_loop.immediately(name: "render", payload: { reset: true  })
-    end
-
-    #
-    # Process a character. If the key corresponding to the inputted character
-    # is bound to an action, call <tt>press_key</tt>, otherwise call <tt>default_action</tt>.
-    # This method is called automatically by <tt>read</tt>
-    #
-    def process_character
-      if @char.is_a?(Array)
-        key_binding = env.key_binding_for_bytes(@char)
-        key_binding.call if key_binding
-      else
-        default_action
+          @terminal.move_to_beginning_of_row
+          @terminal.puts
+        end
+        @event_loop.immediately(name: "line_read", payload: { line: @line.text.without_ansi.dup })
+        @event_loop.immediately(name: "prepare_new_line") do
+          history.clear_position
+          reset_line
+          move_to_beginning_of_input
+        end
+        @event_loop.immediately(name: "restore_tty_attrs") { @terminal.restore_tty_attrs }
+        @event_loop.immediately(name: "render", payload: { reset: true  })
       end
     end
 
@@ -316,42 +323,18 @@ module RawLine
     # * The value can be a Fixnum, a String or an Array.
     #
     def bind(key, &block)
-      env.bind(key, &block)
+      @normal_mode.bind(key, &block)
     end
 
     def unbind(key)
-      env.unbind(key)
+      @normal_mode.unbind(key)
     end
 
     #
     # Return true if the last character read via <tt>read</tt> is bound to an action.
     #
     def key_bound?
-      env.key_bound?(@char)
-    end
-
-    #
-    # Call the action bound to the last character read via <tt>read</tt>.
-    # This method is called automatically by <tt>process_character</tt>.
-    #
-    def press_key
-      env.key_binding_for_bytes(@char).call
-    end
-
-    #
-    # Execute the default action for the last character read via <tt>read</tt>.
-    # By default it prints the character to the screen via <tt>write</tt>.
-    # This method is called automatically by <tt>process_character</tt>.
-    #
-    def default_action
-      insert(@char)
-    end
-
-    #
-    # Parse a key or key sequence into the corresponding codes.
-    #
-    def parse_key_code_sequences(bytes)
-      KeycodeParser.new(@terminal.keys).parse_bytes_into_sequences(bytes)
+      @normal_mode.key_bound?(@char)
     end
 
     #
@@ -536,16 +519,6 @@ module RawLine
       Treefell['editor'].puts "reset_line"
       initialize_line
       render(reset: true)
-    end
-
-    #
-    # Toggle the editor <tt>@mode</tt> to :replace or :insert (default).
-    #
-    def toggle_mode
-      case @mode
-      when :insert then @mode = :replace
-      when :replace then @mode = :insert
-      end
     end
 
     ############################################################################
@@ -846,11 +819,9 @@ module RawLine
 
     def initialize_line
       focused_input_box.content = ""
-      update_word_separator
       @add_history = true
-      @line = env.initialize_line do |l|
-        l.prompt = @dom.prompt_box.content
-        l.word_separator = @word_separator
+      @line = @normal_mode.initialize_line do |line|
+        line.prompt = @dom.prompt_box.content
       end
       @line_editor = LineEditor.new(
         @line,
@@ -858,17 +829,6 @@ module RawLine
       )
       add_to_line_history
       @allow_prompt_updates = true
-    end
-
-    def update_word_separator
-      return @word_separator = "" if @word_break_characters.to_s == ""
-      chars = []
-      @word_break_characters.each_byte do |c|
-        ch = (c.is_a? Fixnum) ? c : c.ord
-        value = (ch == ?\s.ord) ? ' ' : Regexp.escape(ch.chr).to_s
-        chars << value
-      end
-      @word_separator = /(?<!\\)[#{chars.join}]/
     end
 
     def generic_history_back(history)
