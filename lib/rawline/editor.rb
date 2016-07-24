@@ -16,6 +16,7 @@ require 'term/ansicolor'
 require 'fcntl'
 
 require 'rawline/editor/environment'
+require 'rawline/editor/modes'
 
 module RawLine
 
@@ -104,6 +105,12 @@ module RawLine
       @input = input
       @renderer = renderer
       @terminal = terminal
+
+      @modes = []
+      @active_major_modes = []
+      @active_minor_modes = []
+
+
 
       @env_stack = []
       push_new_env(terminal: terminal) do |env|
