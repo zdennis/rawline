@@ -28,6 +28,10 @@ module RawLine
         update_word_separator
       end
 
+      def word_separator
+        @word_separator ||= update_word_separator
+      end
+
       protected
 
       def update_word_separator

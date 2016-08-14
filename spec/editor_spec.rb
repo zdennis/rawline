@@ -72,6 +72,7 @@ describe RawLine::Editor do
     ) do |editor|
       editor.prompt = ">"
     end
+    @editor.event_loop.tick
     @editor.on_read_line do |event|
       line = event[:payload][:line]
     end
@@ -85,30 +86,65 @@ describe RawLine::Editor do
     expect(@editor.dom.input_box.content).to eq("test #1")
   end
 
-  it "can bind keys to code blocks" do
-    @editor.bind(:ctrl_w) { @editor.write "test #2a" }
-    @editor.bind(?\C-q) { "test #2b" }
-    @editor.bind(21) { "test #2c" }
-    @editor.bind([22]) { "test #2d" }
-    @editor.terminal.escape_codes = [] # remove any existing escape codes
-    expect {@editor.bind({:test => [?\e.ord, ?t.ord, ?e.ord, ?s.ord, ?t.ord]}) { "test #2e" }}.to raise_error(RawLine::BindingException)
-    @editor.terminal.escape_codes << ?\e.ord
-    expect {@editor.bind({:test => "\etest"}) { "test #2e" }}.to_not raise_error
-    expect {@editor.bind("\etest2") { "test #2f" }}.to_not raise_error
-    input << ?\C-w
-    input.rewind
-    @editor.event_loop.tick
-    expect(@editor.line.text).to eq("test #2a")
-    @editor.char = [?\C-q.ord]
-    expect(@editor.press_key).to eq("test #2b")
-    @editor.char = [?\C-u.ord]
-    expect(@editor.press_key).to eq("test #2c")
-    @editor.char = [?\C-v.ord]
-    expect(@editor.press_key).to eq("test #2d")
-    @editor.char = [?\e.ord, ?t.ord, ?e.ord, ?s.ord, ?t.ord]
-    expect(@editor.press_key).to eq("test #2e")
-    @editor.char = [?\e.ord, ?t.ord, ?e.ord, ?s.ord, ?t.ord, ?2.ord]
-    expect(@editor.press_key).to eq("test #2f")
+  describe 'binding keys to code blocks' do
+    it 'raises a BindingException when trying with bind with an unrecognized escape code' do
+      @editor.terminal.escape_codes = [] # remove any existing escape codes
+      expect do
+        @editor.bind(test: "\etest") { "test #2e" }
+      end.to raise_error(RawLine::BindingException)
+    end
+
+    it 'does not raise an error when using a recognized escape code' do
+      @editor.terminal.escape_codes << ?\e.ord
+
+      expect do
+        @editor.bind(test: "\etest") { }
+      end.to_not raise_error
+
+      expect do
+        @editor.bind("\etest2") { }
+      end.to_not raise_error
+    end
+
+    it 'binds Ctrl sequences to code blocks with bytes' do
+      @editor.bind(?\C-w) { @editor.write "test #2a" }
+      input << ?\C-w
+      input.rewind
+      @editor.event_loop.tick
+      expect(@editor.line.text).to eq("test #2a")
+    end
+
+    it 'binds Ctrl sequences to code blocks with :ctrl_<letter>' do
+      @editor.bind(:ctrl_w) { @editor.write "test #2a" }
+      input << ?\C-w
+      input.rewind
+      @editor.event_loop.tick
+      expect(@editor.line.text).to eq("test #2a")
+    end
+
+    it 'binds with a single byte representing the key-code' do
+      @editor.bind(21) { @editor.write "test #2c" }
+      input << ?\C-u
+      input.rewind
+      @editor.event_loop.tick
+      expect(@editor.line.text).to eq("test #2c")
+    end
+
+    it 'binds with a single byte array representing the key code' do
+      @editor.bind([22]) { @editor.write "test #2d" }
+      input << ?\C-v
+      input.rewind
+      @editor.event_loop.tick
+      expect(@editor.line.text).to eq("test #2d")
+    end
+
+    it 'binds with a multi byte array representing the key code' do
+      @editor.bind(test: "\etest") { @editor.write "test #2e" }
+      input << ?\e << ?t << ?e << ?s << ?t
+      input.rewind
+      @editor.event_loop.tick
+      expect(@editor.line.text).to eq("test #2e")
+    end
   end
 
   describe 'bubbling key bindings up the environment stack' do

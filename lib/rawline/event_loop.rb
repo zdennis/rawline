@@ -111,8 +111,12 @@ module RawLine
     end
 
     def dispatch_event(event)
-      @registry.subscribers_for_event(event[:name]).each do |subscriber|
-        subscriber.call(event)
+      Treefell['editor']['dispatch_event'].puts event[:name]
+      @registry.subscribers_for_event(event[:name]).each do |subscription|
+        subscription[:subscriber].call(event)
+        if subscription[:once]
+          @registry.unsubscribe subscription, event[:name]
+        end
       end
 
       callback = event[:_event_callback]

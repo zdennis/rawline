@@ -41,11 +41,11 @@ module RawLine
         end
 
         @first_time = false
-      elsif bytes.map(&:ord) == @keys[:left_arrow]
+      elsif bytes == @keys[:left_arrow]
         select_previous
-      elsif bytes.map(&:ord) == @keys[:right_arrow]
+      elsif bytes == @keys[:right_arrow]
         select_next
-      elsif bytes.map(&:ord) == @completion_char
+      elsif bytes == @completion_char
         select_next
       else
         Treefell['editor'].puts "completer, done with leftover bytes: #{bytes.inspect}"

@@ -12,14 +12,14 @@ module RawLine
       attr_reader :env
       attr_accessor :bubble_input
 
-      def initialize(previous: nil)
+      def initialize(previous: nil, bubble_input: false)
         @previous_mode = previous
-        @bubble_input = false
+        @bubble_input = bubble_input
       end
 
       def initialize_line(&blk)
         Line.new(env.line_history_size) do |line|
-          line.word_separator = @word_separator
+          line.word_separator = env.word_separator
           blk.call(line) if blk
         end
       end
@@ -28,6 +28,15 @@ module RawLine
         @editor = editor
         @keys = KeyBindings.new(terminal: @editor.terminal)
         @env = Editor::Environment.new
+        install_key_bindings
+      end
+
+      def bubble_input?
+        !!@bubble_input
+      end
+
+      def deactivate(editor)
+        # no-op
       end
 
       def read_bytes(bytes)
@@ -76,13 +85,25 @@ module RawLine
         @editor.insert(byte_sequence)
       end
 
+      def install_key_bindings
+        bind(:space) { @editor.insert(' ') }
+        bind(:enter) { @editor.newline }
+        bind(:tab) { @editor.complete }
+        bind(:backspace) { @editor.delete_left_character }
+        bind(:ctrl_c) { raise Interrupt }
+        bind(:ctrl_k) { @editor.clear_line }
+        bind(:ctrl_u) { @editor.undo }
+        bind(:ctrl_r) { @editor.redo }
+        bind(:left_arrow) { @editor.move_left }
+        bind(:right_arrow) { @editor.move_right }
+        bind(:up_arrow) { @editor.history_back }
+        bind(:down_arrow) { @editor.history_forward }
+        bind(:delete) { @editor.delete_character }
+        bind(:insert) { @editor.toggle_mode }
+      end
+
       def key_binding_for_bytes(bytes)
-        key_binding = @keys[bytes]
-        if !key_binding && @bubble_input && @previous_mode
-          key_binding || @previous_mode.key_binding_for_bytes(bytes)
-        else
-          key_binding
-        end
+        @keys[bytes]
       end
 
       #
@@ -100,7 +121,7 @@ module RawLine
       def process_character(byte_sequence)
         if byte_sequence.is_a?(Array)
           key_binding = key_binding_for_bytes(byte_sequence)
-          key_binding.call if key_binding
+          key_binding.call(byte_sequence) if key_binding
         else
           default_action(byte_sequence)
         end

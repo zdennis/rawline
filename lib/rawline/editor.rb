@@ -30,7 +30,6 @@ module RawLine
   #
   # Note that the following default key bindings are provided:
   #
-  # * TAB: word completion defined via completion_proc
   # * LEFT/RIGHT ARROWS: cursor movement (left/right)
   # * UP/DOWN ARROWS: history navigation
   # * DEL: Delete character under cursor
@@ -46,8 +45,7 @@ module RawLine
 
     attr_accessor :char
     attr_accessor :terminal, :mode
-    attr_accessor :completion_proc, :line, :history
-    attr_accessor :match_hidden_files
+    attr_accessor :line, :history
     attr_accessor :dom
 
     # TODO: dom traversal for lookup rather than assignment
@@ -94,7 +92,6 @@ module RawLine
     # to read from input and perform line-editing operations.
     # This method takes an optional block used to override the
     # following instance attributes:
-    # * <tt>@completion_proc</tt> - a Proc object used to perform word completion.
     # * <tt>@terminal</tt> -  a RawLine::Terminal containing character key codes.
     #
     def initialize(dom:, input:, renderer:, terminal:)
@@ -103,18 +100,19 @@ module RawLine
       @renderer = renderer
       @terminal = terminal
 
+      @event_registry = Rawline::EventRegistry.new
+      @event_loop = Rawline::EventLoop.new(registry: @event_registry)
+
       @registered_mode_types = {}
       @active_major_modes = []
       @active_minor_modes = []
 
       register_mode Modes::NormalMode
+      register_mode Modes::TabCompletionMode
+
       activate_mode Modes::NormalMode.name
       @normal_mode = current_mode
 
-      @completion_proc = filename_completion_proc
-
-      @match_hidden_files = false
-      set_default_keys
       @add_history = false
       yield self if block_given?
 
@@ -124,37 +122,50 @@ module RawLine
 
     attr_reader :dom, :event_loop, :input
 
-    def activate_mode(name)
+    def activate_mode(name, on_deactivate: nil)
+      @mode_deactivation_blocks ||= {}
       mode_type = @registered_mode_types.fetch(name, "Unknown mode type with name #{name.inspect}")
       if mode_type.major_mode?
         mode_instance = mode_type.new(previous: current_mode)
-        if current_mode
-          deactivate_mode current_mode.class.name
-        end
-        mode_instance.activate(self)
         @active_major_modes << mode_instance
-      else
         mode_instance.activate(self)
+      else
         @active_minor_modes << mode_instance
+        mode_instance.activate(self)
       end
+      @mode_deactivation_blocks[name] = on_deactivate
+
+      event_name = "activate_mode:#{name}"
+      Treefell['editor'].puts event_name
+      @event_loop.add_event name: event_name
     end
 
     def deactivate_mode(name)
-      mode_type = @registered_mode_types.fetch(name, "Unknown mode type with name #{name.inspect}")
-      if mode_type.major_mode?
-        mode = @active_major_modes.last
-        if mode.last.is_a?(mode_type)
-          @active_major_modes.pop
-          mode.deactivate(self)
+      event_name = "deactivate_mode:#{name}"
+      subscribe_once event_name do
+        mode_type = @registered_mode_types.fetch(name, "Unknown mode type with name #{name.inspect}")
+
+        if mode_type.major_mode?
+          if current_mode.is_a?(mode_type)
+            current_mode.deactivate(self)
+            @active_major_modes.pop
+          else
+            fail "Trying to deactivate #{name.inspect} major mode, but it is not active."
+          end
         else
-          fail "Trying to deactivate #{name.inspect} major mode, but it is not active."
+          mode = @active_minor_modes.detect { |mode| mode.s_a?(mode_type) }
+          mode || fail("Trying to deactivate #{name.inspect} minor mode, but it is not active")
+          mode.deactivate(self)
+          @active_minor_modes.delete(mode)
         end
-      else
-        mode = @active_minor_modes.detect { |mode| mode.s_a?(mode_type) }
-        mode || fail("Trying to deactivate #{name.inspect} minor mode, but it is not active")
-        @active_minor_modes.delete(mode)
-        mode.deactivate(self)
+
+        on_deactivate = @mode_deactivation_blocks[name]
+        on_deactivate.call if on_deactivate
+        @mode_deactivation_blocks.delete(name)
       end
+
+      Treefell['editor'].puts event_name
+      @event_loop.add_event name: event_name
     end
 
     def current_mode
@@ -169,12 +180,16 @@ module RawLine
       @normal_mode.env
     end
 
-    def completion_class
-      @normal_mode.env.completion_class
-    end
-
     def history
       @normal_mode.env.history
+    end
+
+    def word_break_characters=(str)
+      @normal_mode.env.word_break_characters = str
+    end
+
+    def word_break_characters
+      @normal_mode.env.word_break_characters
     end
 
     #
@@ -189,7 +204,7 @@ module RawLine
     end
 
     def prompt=(text)
-      return if @line && @line.prompt == text
+      return if @line && @prompt == text
       @prompt = Prompt.new(text)
       Treefell['editor'].puts "prompt=#{prompt.inspect}"
       @dom.prompt_box.content = @prompt
@@ -241,6 +256,10 @@ module RawLine
       @event_registry.subscribe(*args, &blk)
     end
 
+    def subscribe_once(*args, &blk)
+      @event_registry.subscribe_once(*args, &blk)
+    end
+
     # Returns the Editor's event loop.
     def events
       @event_loop
@@ -254,34 +273,21 @@ module RawLine
 
     def check_for_keyboard_input
       bytes = @input.read
-      current_mode.read_bytes(bytes) if bytes.any?
+      current_mode = self.current_mode
+
+      loop do
+        bytes = current_mode.read_bytes(bytes)
+        break if bytes.nil? || bytes.empty?
+        if current_mode.bubble_input?
+          current_mode = current_mode.previous_mode
+          break if current_mode.nil?
+        else
+          break
+        end
+      end
+
       @event_loop.add_event name: 'check_for_keyboard_input'
     end
-
-    # def read_bytes(bytes)
-    #   return unless bytes.any?
-    #
-    #   Treefell['editor'].puts "read_bytes #{bytes.inspect}"
-    #   old_position = @line.position
-    #
-    #   key_code_sequences = parse_key_code_sequences(bytes)
-    #
-    #   Treefell['editor'].puts "key code sequences: #{key_code_sequences.inspect}"
-    #   begin
-    #     key_code_sequences.each do |sequence|
-    #       @char = sequence
-    #       if @char == @terminal.keys[:enter] || !@char
-    #         Treefell['editor'].puts "processing line: #{@line.text.inspect}"
-    #
-    #         @renderer.rollup { process_line }
-    #       else
-    #         process_character
-    #         new_position = @line.position
-    #       end
-    #     end
-    #   end
-    #   []
-    # end
 
     def process_line
       @renderer.rollup do
@@ -331,10 +337,10 @@ module RawLine
     end
 
     #
-    # Return true if the last character read via <tt>read</tt> is bound to an action.
+    # Return true if the given bytes <tt>read</tt> is bound to an action.
     #
-    def key_bound?
-      @normal_mode.key_bound?(@char)
+    def key_bound?(bytes)
+      @normal_mode.key_bound?(bytes)
     end
 
     #
@@ -542,10 +548,7 @@ module RawLine
     ############################################################################
 
     #
-    # Complete the current word according to what returned by
-    # <tt>@completion_proc</tt>. Characters can be appended to the
-    # completed word via <tt>@completion_append_character</tt> and word
-    # separators can be defined via <tt>@word_separator</tt>.
+    # Activate tab-completion-mode.
     #
     # This action is bound to the tab key by default, so the first
     # match is displayed the first time the user presses tab, and all
@@ -554,113 +557,42 @@ module RawLine
     #
     def complete
       focused_input_box.cursor_off
-      completer = completion_class.new(
-        char: @char,
-        line: @line,
-        completion: @completion_proc,
-        completion_found: -> (completion:, possible_completions:) {
-          completion_found(completion: completion, possible_completions: possible_completions)
-        },
-        completion_not_found: -> {
-          completion_not_found
-        },
-        completion_selected: -> (completion) {
-          completion_selected(completion)
-        },
-        done: -> {
-          completion_done
-          focused_input_box.cursor_on
-          pop_env
-        },
-        keys: terminal.keys
-      )
-      push_new_env do |env|
-        env.key_bindings_fall_back_to_parent = true
-        env.push_keyboard_input_processor completer
-      end.read_bytes(@char)
+      activate_mode Modes::TabCompletionMode.name,
+        on_deactivate: proc { focused_input_box.cursor_on }
     end
 
-    def completion_found(completion:, possible_completions:)
-      Treefell['editor'].puts "word-completion-found: #{completion.inspect} possible_completions: #{possible_completions.inspect}"
-      if @on_word_complete
-        word = @line.word[:text]
-        sub_word = @line.text[@line.word[:start]..@line.position-1] || ""
-        @on_word_complete.call(name: "word-completion", payload: { sub_word: sub_word, word: word, completion: completion, possible_completions: possible_completions })
-      end
-
-      completion_selected(completion)
-    end
-
-    def completion_selected(completion)
-      Treefell['editor'].puts "word-completion-selected #{completion.inspect}"
-      move_to_position @line.word[:end]
-      delete_n_characters(@line.word[:end] - @line.word[:start], true)
-      write completion.to_s
-
-      if @on_word_completion_selected
-        Treefell['editor'].puts "word-completion-selected callback called with #{completioni}"
-        @on_word_completion_selected.call(name: "word-completion-selected", payload: { completion: completion })
-      end
-    end
-
-    def completion_not_found
-      Treefell['editor'].puts 'word-completion-not-found'
-      if @on_word_complete_no_match
-        word = @line.word[:text]
-        sub_word = @line.text[@line.word[:start]..@line.position-1] || ""
-        payload = { sub_word: sub_word, word: word }
-        Treefell['editor'].puts "word-completion-not-found calling callback with payload: #{payload.inspect}"
-        @on_word_complete_no_match.call(name: "word-completion-no-match", payload: payload)
-      else
-        Treefell['editor'].puts 'word-completion-not-found no on_word_complete_no_match callback to call'
-      end
-    end
-
-    def completion_done
-      if @on_word_complete_done
-        Treefell['editor'].puts "word-completion-done calling on_word_complete_done callback"
-        @on_word_complete_done.call
-      else
-        Treefell['editor'].puts 'word-completion-done no on_word_complete_done callback to call'
-      end
-    end
+    attr_accessor :completion_proc
 
     def on_word_complete(&blk)
-      Treefell['editor'].puts "setting on_word_complete callback"
-      @on_word_complete = blk
+      if block_given?
+        Treefell['editor'].puts "setting on_word_complete callback"
+        @on_word_complete = blk
+      end
+      @on_word_complete
     end
 
     def on_word_complete_no_match(&blk)
-      Treefell['editor'].puts "setting on_word_complete_no_match callback"
-      @on_word_complete_no_match = blk
+      if block_given?
+        Treefell['editor'].puts "setting on_word_complete_no_match callback"
+        @on_word_complete_no_match = blk
+      end
+      @on_word_complete_no_match
     end
 
     def on_word_complete_done(&blk)
-      Treefell['editor'].puts "setting on_word_complete_done callback"
-      @on_word_complete_done = blk
+      if block_given?
+        Treefell['editor'].puts "setting on_word_complete_done callback"
+        @on_word_complete_done = blk
+      end
+      @on_word_complete_done
     end
 
     def on_word_completion_selected(&blk)
-      Treefell['editor'].puts "setting on_word_completion_selected callback"
-      @on_word_completion_selected = blk
-    end
-
-    #
-    # Complete file and directory names.
-    # Hidden files and directories are matched only if <tt>@match_hidden_files</tt> is true.
-    #
-    def filename_completion_proc
-      lambda do |word, _|
-        dirs = @line.text.split('/')
-          path = @line.text.match(/^\/|[a-zA-Z]:\//) ? "/" : Dir.pwd+"/"
-        if dirs.length == 0 then # starting directory
-          dir = path
-        else
-          dirs.delete(dirs.last) unless File.directory?(path+dirs.join('/'))
-          dir = path+dirs.join('/')
-        end
-        Dir.entries(dir).select { |e| (e =~ /^\./ && @match_hidden_files && word == '') || (e =~ /^#{word}/ && e !~ /^\./) }
+      if block_given?
+        Treefell['editor'].puts "setting on_word_completion_selected callback"
+        @on_word_completion_selected = blk
       end
+      @on_word_completion_selected
     end
 
     ############################################################################
@@ -783,11 +715,8 @@ module RawLine
     private
 
     def initialize_events
-      @event_registry = Rawline::EventRegistry.new do |registry|
-        registry.subscribe :default, -> (_) { self.check_for_keyboard_input }
-        registry.subscribe :dom_tree_change, -> (_) { self.render }
-      end
-      @event_loop = Rawline::EventLoop.new(registry: @event_registry)
+      @event_registry.subscribe :default, -> (_) { self.check_for_keyboard_input }
+      @event_registry.subscribe :dom_tree_change, -> (_) { self.render }
 
       @dom.on(:content_changed) do |*args|
         Treefell['editor'].puts 'DOM content changed, re-rendering'
@@ -797,6 +726,11 @@ module RawLine
       @dom.on(:child_changed) do |*args|
         Treefell['editor'].puts 'DOM child changed, re-rendering'
         @event_loop.add_event name: "render"
+      end
+
+      @dom.on(:cursor_changed) do |*args|
+        Treefell['editor'].puts 'DOM cursor changed, rendering cursor'
+        @renderer.render_cursor
       end
 
       @dom.on :position_changed do |*args|
@@ -852,23 +786,6 @@ module RawLine
         cursor_position = nil
         overwrite_line(line, position: cursor_position, highlight_up_to: cursor_position)
       end
-    end
-
-    def set_default_keys
-      bind(:space) { insert(' ') }
-      bind(:enter) { newline }
-      bind(:tab) { complete }
-      bind(:backspace) { delete_left_character }
-      bind(:ctrl_c) { raise Interrupt }
-      bind(:ctrl_k) { clear_line }
-      bind(:ctrl_u) { undo }
-      bind(:ctrl_r) { self.redo }
-      bind(:left_arrow) { move_left }
-      bind(:right_arrow) { move_right }
-      bind(:up_arrow) { history_back }
-      bind(:down_arrow) { history_forward }
-      bind(:delete) { delete_character }
-      bind(:insert) { toggle_mode }
     end
 
     def terminal_row_for_line_position(line_position)
