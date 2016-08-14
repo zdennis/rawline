@@ -276,8 +276,11 @@ module RawLine
       current_mode = self.current_mode
 
       loop do
-        bytes = current_mode.read_bytes(bytes)
         break if bytes.nil? || bytes.empty?
+
+        leftover_bytes = current_mode.read_bytes(bytes)
+        break if leftover_bytes.nil? || leftover_bytes.empty?
+
         if current_mode.bubble_input?
           current_mode = current_mode.previous_mode
           break if current_mode.nil?
